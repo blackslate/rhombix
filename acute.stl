@@ -2,79 +2,86 @@ solid acute
 
   facet normal 0 0 -1
     outer loop
-      vertex 340.260323340816 105.14622242382671 0
-      vertex 170.130161670408 210.29244484765343 0
-      vertex 170.130161670408 0 0
+      vertex 0 105.146 0
+      vertex 170.13 0 0
+      vertex 0 -105.146 0
     endloop
   endfacet
   facet normal 0 0 -1
     outer loop
-      vertex 170.130161670408 210.29244484765343 0
-      vertex 0 105.14622242382671 0
-      vertex 170.130161670408 0 0
+      vertex -170.13 0 0
+      vertex 0 105.146 0
+      vertex 0 -105.146 0
     endloop
   endfacet
-  facet normal 1.0514622242382672 1.70130161670408 0
+  facet normal 1.051 1.701 0
     outer loop
-      vertex 340.260323340816 105.14622242382671 0
-      vertex 340.260323340816 105.14622242382671 4
-      vertex 170.130161670408 210.29244484765343 0
+      vertex 170.13 0 4
+      vertex 170.13 0 0
+      vertex 0 105.146 0
     endloop
   endfacet
-  facet normal 1.0514622242382672 1.70130161670408 0
+  facet normal 1.051 1.701 0
     outer loop
-      vertex 340.260323340816 105.14622242382671 4
-      vertex 170.130161670408 210.29244484765343 4
-      vertex 170.130161670408 210.29244484765343 0
+      vertex 0 105.146 4
+      vertex 170.13 0 4
+      vertex 0 105.146 0
     endloop
   endfacet
-  facet normal 1.0514622242382672 -1.70130161670408 0
+  facet normal -1.051 1.701 0
     outer loop
-      vertex 170.130161670408 210.29244484765343 0
-      vertex 170.130161670408 210.29244484765343 4
-      vertex 0 105.14622242382671 0
+      vertex 0 105.146 4
+      vertex 0 105.146 0
+      vertex -170.13 0 0
     endloop
   endfacet
-  facet normal -1.0514622242382672 -1.70130161670408 0
+  facet normal -1.051 1.701 0
     outer loop
-      vertex 340.260323340816 105.14622242382671 4
-      vertex 0 105.14622242382671 4
-      vertex 0 105.14622242382671 0
+      vertex -170.13 0 4
+      vertex 0 105.146 4
+      vertex -170.13 0 0
     endloop
   endfacet
-  facet normal -1.0514622242382672 -1.70130161670408 0
+  facet normal -1.051 -1.701 0
     outer loop
-      vertex 0 105.14622242382671 0
-      vertex 0 105.14622242382671 4
-      vertex 170.130161670408 0 0
+      vertex -170.13 0 4
+      vertex -170.13 0 0
+      vertex 0 -105.146 0
     endloop
   endfacet
-  facet normal -1.0514622242382672 1.70130161670408 0
+  facet normal -1.051 -1.701 0
     outer loop
-      vertex 0 105.14622242382671 4
-      vertex 170.130161670408 0 4
-      vertex 170.130161670408 0 0
+      vertex 0 -105.146 4
+      vertex -170.13 0 4
+      vertex 0 -105.146 0
     endloop
   endfacet
-  facet normal -1.0514622242382672 1.70130161670408 0
+  facet normal 1.051 -1.701 0
     outer loop
-      vertex 170.130161670408 0 4
-      vertex 170.130161670408 210.29244484765343 0
-      vertex 340.260323340816 105.14622242382671 0
+      vertex 0 -105.146 4
+      vertex 0 -105.146 0
+      vertex 170.13 0 0
+    endloop
+  endfacet
+  facet normal 1.051 -1.701 0
+    outer loop
+      vertex 170.13 0 4
+      vertex 0 -105.146 4
+      vertex 170.13 0 0
     endloop
   endfacet
   facet normal 0 0 1
     outer loop
-      vertex 340.260323340816 105.14622242382671 4
-      vertex 170.130161670408 0 4
-      vertex 170.130161670408 210.29244484765343 4
+      vertex 0 -105.146 4
+      vertex 170.13 0 4
+      vertex 0 105.146 4
     endloop
   endfacet
   facet normal 0 0 1
     outer loop
-      vertex 170.130161670408 210.29244484765343 4
-      vertex 170.130161670408 0 4
-      vertex 0 105.14622242382671 4
+      vertex 0 -105.146 4
+      vertex 0 105.146 4
+      vertex -170.13 0 4
     endloop
   endfacet
 endsolid acute
