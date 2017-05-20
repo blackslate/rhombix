@@ -37,88 +37,109 @@
   var total
   var ii
 
-  var output = document.getElementById("output")
+  var fs = require("fs")
+  var vFile = "v"
+  var path = "output/"
+  var v 
 
-  // Vertices for base
-  vertices.push([offsetX, 0, 0])
-  vertices.push([0, offsetY, 0])
-  vertices.push([-offsetX, 0, 0])
-  vertices.push([0, -offsetY, 0])
+  fs.readFile(vFile, versionIt)
 
-  vertices.push([offsetX, 0, ply])
-  vertices.push([0, offsetY, ply])
-  vertices.push([-offsetX, 0, ply])
-  vertices.push([0, -offsetY, ply])
+  function versionIt(error, data) {
+    if (error) {
+      v = "001"
+    } else {
+      v = parseInt(data, 10) + 1
+      if (v < 10) {
+        v = "00" + v
+      } else if (v < 100) {
+        v = "0" + v
+      }
+      }
 
-  // Faces for underneath
-  normal = [0, 0, -1]
-  faceIndices.push([1, 0, 3])
-  faceNormals.push(normal)
-  faceIndices.push([2, 1, 3])
-  faceNormals.push(normal)
+    // Vertices for base
+    vertices.push([offsetX, 0, 0])
+    vertices.push([0, offsetY, 0])
+    vertices.push([-offsetX, 0, 0])
+    vertices.push([0, -offsetY, 0])
 
-  // Faces for edges
-  normal = [q, p, 0]
-  faceIndices.push([4, 0, 1])
-  faceNormals.push(normal)
-  faceIndices.push([5, 4, 1])
-  faceNormals.push(normal)
-  
-  normal = [-q, p, 0]
-  faceIndices.push([5, 1, 2])
-  faceNormals.push(normal)
-  faceIndices.push([6, 5, 2])
-  faceNormals.push(normal)
- 
-  normal = [-q, -p, 0]
-  faceIndices.push([6, 2, 3])
-  faceNormals.push(normal)
-  faceIndices.push([7, 6, 3])
-  faceNormals.push(normal)
-  
-  normal = [q, -p, 0]
-  faceIndices.push([7, 3, 0])
-  faceNormals.push(normal)
-  faceIndices.push([4, 7, 0])
-  faceNormals.push(normal)
+    vertices.push([offsetX, 0, ply])
+    vertices.push([0, offsetY, ply])
+    vertices.push([-offsetX, 0, ply])
+    vertices.push([0, -offsetY, ply])
 
-  // Faces for top
-  normal = [0, 0, 1]
-  faceIndices.push([7, 4, 5])
-  faceNormals.push(normal)
-  faceIndices.push([7, 5, 6])
-  faceNormals.push(normal)
+    // Faces for underneath
+    normal = [0, 0, -1]
+    faceIndices.push([1, 0, 3])
+    faceNormals.push(normal)
+    faceIndices.push([2, 1, 3])
+    faceNormals.push(normal)
 
-  total = faceIndices.length
-  ii
-  
-  for (ii = 0; ii < total; ii += 1) {
-    normal = faceNormals[ii]
-    face = faceIndices[ii]
-    stl += "\n  facet normal " + e(normal[0]) 
-                         + " " + e(normal[1])
-                         + " " + e(normal[2])
-    stl += "\n    outer loop" 
+    // Faces for edges
+    normal = [q, p, 0]
+    faceIndices.push([4, 0, 1])
+    faceNormals.push(normal)
+    faceIndices.push([5, 4, 1])
+    faceNormals.push(normal)
+    
+    normal = [-q, p, 0]
+    faceIndices.push([5, 1, 2])
+    faceNormals.push(normal)
+    faceIndices.push([6, 5, 2])
+    faceNormals.push(normal)
+   
+    normal = [-q, -p, 0]
+    faceIndices.push([6, 2, 3])
+    faceNormals.push(normal)
+    faceIndices.push([7, 6, 3])
+    faceNormals.push(normal)
+    
+    normal = [q, -p, 0]
+    faceIndices.push([7, 3, 0])
+    faceNormals.push(normal)
+    faceIndices.push([4, 7, 0])
+    faceNormals.push(normal)
 
-    stl += "\n      vertex " + e(vertices[face[0]][0]) // + offsetX)
-                       + " " + e(vertices[face[0]][1]) // + offsetY)
-                       + " " + e(vertices[face[0]][2])
+    // Faces for top
+    normal = [0, 0, 1]
+    faceIndices.push([7, 4, 5])
+    faceNormals.push(normal)
+    faceIndices.push([7, 5, 6])
+    faceNormals.push(normal)
 
-    stl += "\n      vertex " + e(vertices[face[1]][0]) // + offsetX)
-                       + " " + e(vertices[face[1]][1]) // + offsetY)
-                       + " " + e(vertices[face[1]][2])
+    total = faceIndices.length
+    ii
+    
+    for (ii = 0; ii < total; ii += 1) {
+      normal = faceNormals[ii]
+      face = faceIndices[ii]
+      stl += "\n  facet normal " + e(normal[0]) 
+                           + " " + e(normal[1])
+                           + " " + e(normal[2])
+      stl += "\n    outer loop" 
 
-    stl += "\n      vertex " + e(vertices[face[2]][0]) // + offsetX)
-                       + " " + e(vertices[face[2]][1]) // + offsetY)
-                       + " " + e(vertices[face[2]][2])
-  
-    stl += "\n    endloop"
-    stl += "\n  endfacet"
+      stl += "\n      vertex " + e(vertices[face[0]][0]) // + offsetX)
+                         + " " + e(vertices[face[0]][1]) // + offsetY)
+                         + " " + e(vertices[face[0]][2])
+
+      stl += "\n      vertex " + e(vertices[face[1]][0]) // + offsetX)
+                         + " " + e(vertices[face[1]][1]) // + offsetY)
+                         + " " + e(vertices[face[1]][2])
+
+      stl += "\n      vertex " + e(vertices[face[2]][0]) // + offsetX)
+                         + " " + e(vertices[face[2]][1]) // + offsetY)
+                         + " " + e(vertices[face[2]][2])
+    
+      stl += "\n    endloop"
+      stl += "\n  endfacet"
+    }
+
+    stl += "\nendsolid " + name
+
+    // output.textContent = stl
+    console.log(stl)
+    fs.writeFile(path + name + v + ".stl", stl)
+    fs.writeFile(vFile, v)
   }
-
-  stl += "\nendsolid " + name
-
-  output.textContent = stl
 
   function e(number) {
     return (Math.round(number * 1000) / 1000) //.toExponential()
