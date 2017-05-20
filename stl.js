@@ -24,6 +24,16 @@
   // 2.0344439357957027 radians 116.56505117707799°
   var acute = Math.atan(2)
   // 1.1071487177940904 radians 63.43494882292201°
+  
+  // Angles between faces 
+  var _36degrees = Math.PI / 5 // thin wedge of flat rhombohedron
+  // 1.2566370614359172 radians 72°
+  var _72degrees = _36degrees * 2 // point of pointy rhombohedron
+  // 1.2566370614359172 radians 72°
+  var _108degrees = _36degrees * 3
+  // 1.8849555921538759 radians 108°// side of pointy rhombohedron
+  var _144degrees = _36degrees * 4
+  // 2.5132741228718345 radians 144° // dome of flat rhombohedron
 
   var offsetX = p/2 * edge
   var offsetY = q/2 * edge
@@ -52,56 +62,59 @@
       }
     }
 
-    ;(function prepareBase(){
-      // Vertices for base
-      vertices.push([offsetX, 0, 0])
-      vertices.push([0, offsetY, 0])
-      vertices.push([-offsetX, 0, 0])
-      vertices.push([0, -offsetY, 0])
+    ;(function prepareAcuteRhombus(){
+      ;(function createVertices(){
+        // Exterior vertices for rhombus
+        vertices.push([offsetX, 0, 0])
+        vertices.push([0, offsetY, 0])
+        vertices.push([-offsetX, 0, 0])
+        vertices.push([0, -offsetY, 0])
 
-      vertices.push([offsetX, 0, ply])
-      vertices.push([0, offsetY, ply])
-      vertices.push([-offsetX, 0, ply])
-      vertices.push([0, -offsetY, ply])
+        // Interior
+        addInteriorVerticesAcute()
 
-      // Faces for underneath
-      normal = [0, 0, -1]
-      faceIndices.push([1, 0, 3])
-      faceNormals.push(normal)
-      faceIndices.push([2, 1, 3])
-      faceNormals.push(normal)
+      })()
 
-      // Faces for edges
-      normal = [q, p, 0]
-      faceIndices.push([4, 0, 1])
-      faceNormals.push(normal)
-      faceIndices.push([5, 4, 1])
-      faceNormals.push(normal)
-      
-      normal = [-q, p, 0]
-      faceIndices.push([5, 1, 2])
-      faceNormals.push(normal)
-      faceIndices.push([6, 5, 2])
-      faceNormals.push(normal)
-     
-      normal = [-q, -p, 0]
-      faceIndices.push([6, 2, 3])
-      faceNormals.push(normal)
-      faceIndices.push([7, 6, 3])
-      faceNormals.push(normal)
-      
-      normal = [q, -p, 0]
-      faceIndices.push([7, 3, 0])
-      faceNormals.push(normal)
-      faceIndices.push([4, 7, 0])
-      faceNormals.push(normal)
+      ;(function createFaces(){
+        // // Faces for exterior
+        // normal = [0, 0, -1]
+        // faceIndices.push([1, 0, 3])
+        // faceNormals.push(normal)
+        // faceIndices.push([2, 1, 3])
+        // faceNormals.push(normal)
 
-      // Faces for top
-      normal = [0, 0, 1]
-      faceIndices.push([7, 4, 5])
-      faceNormals.push(normal)
-      faceIndices.push([7, 5, 6])
-      faceNormals.push(normal)
+        // Faces for edges
+        normal = [q, p, 0]
+        faceIndices.push([4, 0, 1])
+        faceNormals.push(normal)
+        faceIndices.push([5, 4, 1])
+        faceNormals.push(normal)
+        
+        normal = [-q, p, 0]
+        faceIndices.push([5, 1, 2])
+        faceNormals.push(normal)
+        faceIndices.push([6, 5, 2])
+        faceNormals.push(normal)
+       
+        normal = [-q, -p, 0]
+        faceIndices.push([6, 2, 3])
+        faceNormals.push(normal)
+        faceIndices.push([7, 6, 3])
+        faceNormals.push(normal)
+        
+        normal = [q, -p, 0]
+        faceIndices.push([7, 3, 0])
+        faceNormals.push(normal)
+        faceIndices.push([4, 7, 0])
+        faceNormals.push(normal)
+
+        // Faces for top
+        normal = [0, 0, 1]
+        faceIndices.push([7, 4, 5])
+        faceNormals.push(normal)
+        faceIndices.push([7, 5, 6])
+        faceNormals.push(normal)
+      })()
     })()
 
     ;(function createSTL(){
@@ -138,6 +151,57 @@
       fs.writeFile(path + name + v + ".stl", stl)
       fs.writeFile(vFile, v)
     })()
+  }
+
+  /* BEVELS *
+    // For both acute and obtuse rhombohedrons, there are two 
+    // different bevels and three different bevel intersection types
+    // in four different places:
+    // Bevels:
+    // - Between adjacent faces (36° for acute, 72° for obtuse)
+    // - Where the sides connect (108° for acute, 18° for obtuse)
+    // Intersection types:
+    // - Where adjacent faces meet at the crown
+    // - At the VV armpits in the broad middle (x2 = left and right)
+    // - At the tip of the opposing Vs
+    // The armpit intersections are at an angle. The two at the inner
+    // tip and outermost points of the rhombus meet on the diagonal.
+  */
+
+  function addInteriorVerticesAcute() {
+    // Bevels:
+    // - 36° between adjacent faces
+    // - 108° where the sides connect
+    // Intersection types:
+    // - 36°-36° at the acute crown
+    // - 36°-108° at obtuse VV armpits (x2 = left and right)
+    // - 108°-108° at the tip of the outer acute Vs
+    // The angled armpit intersections are at the obtuse angle of the
+    // rhombus. The two intersections at the acute ends of the rhombus
+    // meet on the long diagonal.
+
+    vertices.push([offsetX, 0, ply])
+    vertices.push([0, offsetY, ply])
+    vertices.push([-offsetX, 0, ply])
+    vertices.push([0, -offsetY, ply])
+  }
+
+  function addInteriorVerticesObtuse() {
+    // Bevels:
+    // - 72° between adjacent faces
+    // - 18° where the sides connect
+    // Intersection types:
+    // - 72°-72° at the obtuse crown
+    // - 72°-18° at acute VV armpits (x2 = left and right)
+    // - 18°-18° at the tip of the outer obtuse Vs
+    // The angled armpit intersections are at the acute ends of the
+    // rhombus. The two intersections at the obtuse angles of the
+    // rhombus meet on the short diagonal.
+
+    vertices.push([offsetX, 0, ply])
+    vertices.push([0, offsetY, ply])
+    vertices.push([-offsetX, 0, ply])
+    vertices.push([0, -offsetY, ply])
   }
 
   function e(number) {
