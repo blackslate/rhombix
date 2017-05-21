@@ -1,4 +1,7 @@
 ;(function (){
+  var fs = require("fs")
+  var ЗD = require("./3D.js")
+
   // <HARD-CODED>
   var scale = 4
   var edge = 50 * scale
@@ -26,8 +29,13 @@
   // 1.1071487177940904 radians 63.43494882292201°
   
   // Angles between faces 
-  var _36degrees = Math.PI / 5 // thin wedge of flat rhombohedron
-  // 1.2566370614359172 radians 72°
+  var _18degrees = Math.PI / 10 // thin bevel of flat rhombohedron
+  // 0.3141592653589793 radians 18°
+  var _36degrees = _18degrees * 2// point bevel of pointy rhombohedron
+  // 0.6283185307179586 radians 36°
+  var _54degrees = _18degrees * 3// side bevel of pointy rhombohedron
+  // 0.9424777960769379 radians 54°
+  // 
   var _72degrees = _36degrees * 2 // point of pointy rhombohedron
   // 1.2566370614359172 radians 72°
   var _108degrees = _36degrees * 3
@@ -45,7 +53,6 @@
   var normal
   var face
 
-  var fs = require("fs")
   var v 
 
   fs.readFile(vFile, versionIt)
@@ -65,23 +72,25 @@
     ;(function prepareAcuteRhombus(){
       ;(function createVertices(){
         // Exterior vertices for rhombus
-        vertices.push([offsetX, 0, 0])
-        vertices.push([0, offsetY, 0])
-        vertices.push([-offsetX, 0, 0])
-        vertices.push([0, -offsetY, 0])
+        vertices.push(new ЗD.Vector(offsetX, 0, 0))
+        vertices.push(new ЗD.Vector(0, offsetY, 0))
+        vertices.push(new ЗD.Vector(-offsetX, 0, 0))
+        vertices.push(new ЗD.Vector(0, -offsetY, 0))
 
         // Interior
-        addInteriorVerticesAcute()
+        addInteriorVertices(0, _36degrees, _54degrees)
+
+        // addInteriorVertices(1, _18degrees, _72degrees)
 
       })()
 
       ;(function createFaces(){
-        // // Faces for exterior
-        // normal = [0, 0, -1]
-        // faceIndices.push([1, 0, 3])
-        // faceNormals.push(normal)
-        // faceIndices.push([2, 1, 3])
-        // faceNormals.push(normal)
+        // Faces for exterior
+        normal = [0, 0, -1]
+        faceIndices.push([1, 0, 3])
+        faceNormals.push(normal)
+        faceIndices.push([2, 1, 3])
+        faceNormals.push(normal)
 
         // Faces for edges
         normal = [q, p, 0]
@@ -130,17 +139,17 @@
                              + " " + e(normal[2])
         stl += "\n    outer loop" 
 
-        stl += "\n      vertex " + e(vertices[face[0]][0]) // + offsetX)
-                           + " " + e(vertices[face[0]][1]) // + offsetY)
-                           + " " + e(vertices[face[0]][2])
+        stl += "\n      vertex " + e(vertices[face[0]].x) // + offsetX)
+                           + " " + e(vertices[face[0]].y) // + offsetY)
+                           + " " + e(vertices[face[0]].z)
 
-        stl += "\n      vertex " + e(vertices[face[1]][0]) // + offsetX)
-                           + " " + e(vertices[face[1]][1]) // + offsetY)
-                           + " " + e(vertices[face[1]][2])
+        stl += "\n      vertex " + e(vertices[face[1]].x) // + offsetX)
+                           + " " + e(vertices[face[1]].y) // + offsetY)
+                           + " " + e(vertices[face[1]].z)
 
-        stl += "\n      vertex " + e(vertices[face[2]][0]) // + offsetX)
-                           + " " + e(vertices[face[2]][1]) // + offsetY)
-                           + " " + e(vertices[face[2]][2])
+        stl += "\n      vertex " + e(vertices[face[2]].x) // + offsetX)
+                           + " " + e(vertices[face[2]].y) // + offsetY)
+                           + " " + e(vertices[face[2]].z)
       
         stl += "\n    endloop"
         stl += "\n  endfacet"
@@ -168,44 +177,82 @@
     // tip and outermost points of the rhombus meet on the diagonal.
   */
 
-  function addInteriorVerticesAcute() {
+  function addInteriorVertices(pointIndex, innerAngle, outerAngle) {
     // Bevels:
-    // - 36° between adjacent faces
-    // - 108° where the sides connect
+    // - innerAngle between adjacent faces
+    // - outerAngle where the sides connect
     // Intersection types:
-    // - 36°-36° at the acute crown
-    // - 36°-108° at obtuse VV armpits (x2 = left and right)
-    // - 108°-108° at the tip of the outer acute Vs
-    // The angled armpit intersections are at the obtuse angle of the
-    // rhombus. The two intersections at the acute ends of the rhombus
-    // meet on the long diagonal.
+    // - inner-inner at the crown
+    // - inner-outer at VV armpits (x2 = left and right)
+    // - outer-outer at the tip of the acute Vs
 
-    vertices.push([offsetX, 0, ply])
-    vertices.push([0, offsetY, ply])
-    vertices.push([-offsetX, 0, ply])
-    vertices.push([0, -offsetY, ply])
-  }
+    var angles = [innerAngle, outerAngle, outerAngle, innerAngle]
+    var bevelLineArray = [] // [<Line>, <Line>, <Line>, <Line>]
+    var innerPoints = []
 
-  function addInteriorVerticesObtuse() {
-    // Bevels:
-    // - 72° between adjacent faces
-    // - 18° where the sides connect
-    // Intersection types:
-    // - 72°-72° at the obtuse crown
-    // - 72°-18° at acute VV armpits (x2 = left and right)
-    // - 18°-18° at the tip of the outer obtuse Vs
-    // The angled armpit intersections are at the acute ends of the
-    // rhombus. The two intersections at the obtuse angles of the
-    // rhombus meet on the short diagonal.
+    if (pointIndex) {
+      angles.unshift(angles.pop())
+    }
+    populateBevelLineArray()
+    calculateInnerPoints()
 
-    vertices.push([offsetX, 0, ply])
-    vertices.push([0, offsetY, ply])
-    vertices.push([-offsetX, 0, ply])
-    vertices.push([0, -offsetY, ply])
+    vertices = vertices.concat(innerPoints)
+
+    console.log(vertices)
+
+    function populateBevelLineArray() {
+      var endVertex = vertices[0]
+      var ii = vertices.length
+
+      var startVertex
+      var edge
+        , perpendicular
+        , tan
+     
+      for (; ii-- ;) {
+        startVertex = vertices[ii]
+        edge = new ЗD.Line().setFromPoints(startVertex, endVertex)
+        // console.log(edge.toString())
+
+        perpendicular = new ЗD.Vector(0, 0, 1)
+                       .cross(edge.direction)
+        console.log("perpendicular normal ="
+                   , perpendicular.toString()
+                   , perpendicular.magnitude())
+
+        tan = Math.tan(angles[ii])
+        perpendicular.scalarMultiply(ply / tan)
+
+        console.log("perpendicular length ="
+                   , perpendicular.toString()
+                   , perpendicular.magnitude())
+        edge.point =  perpendicular.add(edge.point)
+                                   .add(new ЗD.Vector(0, 0, ply))
+        console.log(edge.toString())
+
+        bevelLineArray.unshift(edge)
+
+        endVertex = startVertex
+      }
+
+      // console.log(bevelLineArray)
+    }
+
+    function calculateInnerPoints() {
+      var total = bevelLineArray.length
+      var other = bevelLineArray.slice(-1)[0] // above vertex 3
+      var ii
+        , line
+      
+      for (ii = 0; ii<total; ii += 1) {
+        line = bevelLineArray[ii]
+        innerPoints[ii] = line.closestPointTo(other)
+        other = line
+      }
+    }
   }
 
   function e(number) {
     return (Math.round(number * 1000) / 1000) //.toExponential()
-  }
-  
+  }  
 })()
