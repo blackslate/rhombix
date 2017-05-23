@@ -81,8 +81,10 @@
         // Interior
         addInteriorVertices(0, _36degrees, _54degrees)
         // addInteriorVertices(1, _18degrees, _72degrees)
-        // 
+        
         addMagnetSupport()
+
+        addWitnessFace()
 
         /* BEVELS *
           // For both acute and obtuse rhombohedrons, there are two 
@@ -200,9 +202,9 @@
           // vertex.copy(bottom.point).subtract(direction)
           // vertices.push(vertex)
 
-          // First draft: an equilateral triangle with its base along
-          // the short diagonal of the rhombus to the corner of the
-          // adjacent faces.
+          // First draft: one third of an equilateral triangle with
+          // its base along the short diagonal of the rhombus to the 
+          // centre between short diagonals on adjacent faces.
 
           var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
           var z = Math.sqrt(1 - x * x)
@@ -211,43 +213,55 @@
             , peak
             , centroid
 
-          x -= p/2 // from origin
+          x = p/2 - x // from origin
 
-          centroid = new ЗD.Vector(x/3, 0, z/3) // unscaled
-          normal = centroid.subtract(new ЗD.Vector(-p/2, 0, 0))
-                           .normalize()
-
-          normals.equilateral1 = [normal.x, normal.x, normal.z]
-          normals.equilateral2 = [-normal.x, -normal.x, -normal.z]
-
-          // <FACE 2>
-          peak = new ЗD.Vector(x, 0, z)
-          normal = peak.clone()
-                       .subtract(new ЗD.Vector(-p/2, 0, 0))
-                       .cross(new ЗD.Vector(0, q/2, 0)
-                               .subtract(new ЗD.Vector(-p/2, 0, 0)))
-                       .normalize()
-          normals.face2out = [normal.x, normal.y, normal.z] 
-          normals.face2in  = [-normal.x, -normal.y, -normal.z]
-
-           var temp = peak.clone()
-                          .subtract(new ЗD.Vector(0, q/2, 0))
-                          .magnitude()
-          console.log(peak, temp, q, temp === q)
-          // </FACE 2>
+          normal = new ЗD.Vector(x/3, 0, z/3) // unscaled
+          normals.support1 = [normal.x, normal.y, normal.z]
+          normals.support2 = [-normal.x, -normal.y, -normal.z]
           
           x *= edge
           z *= edge
 
-          vertex = new ЗD.Vector (x, 0, z)
-          //vertex = new ЗD.Vector (x/3, 0, z/3)
+          /// vertex = new ЗD.Vector (x, 0, z)
+          vertex = new ЗD.Vector (x/3, 0, z/3)
 
           vertices.push(vertex)
+        }  
 
-      
 
-           
-        }
+        function addWitnessFace() {
+          // Unscaled
+          var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
+          var z = Math.sqrt(1 - x * x)
+          var peak
+            , side
+            , vertex
+            , normal
+            , centroid
+
+          x = p/2 - x // from origin
+
+          peak = new ЗD.Vector(x, 0, z)
+          side = new ЗD.Vector(p, q, 0)
+          normal = peak.clone()
+                       .cross(side)
+                       .normalize()
+          normals.face2out = [normal.x, normal.y, normal.z] 
+          normals.face2in  = [-normal.x, -normal.y, -normal.z]
+
+          // var temp = peak.clone()
+          //                .subtract(new ЗD.Vector(0, q/2, 0))
+          //                .magnitude()
+          // console.log(peak, temp, q, Math.abs(temp - q) < 3e-16)
+          // temp = peak.clone()
+          //                .subtract(new ЗD.Vector(0, -q/2, 0))
+          //                .magnitude()
+          // console.log(peak, temp, q, Math.abs(temp - q) < 3e-16)
+
+          vertex = new ЗD.Vector (x * edge, 0, z * edge)
+
+          vertices.push(vertex)
+        }        
       })()
 
       ;(function createFaces(){
@@ -291,21 +305,23 @@
         faceNormals.push(normal)
 
         // Equilateral triangle   
-        faceIndices.push([3, 1, 8])
-        faceNormals.push(normals.equilateral1)
-        faceIndices.push([3, 8, 1])
-        faceNormals.push(normals.equilateral2)
+        faceIndices.push([1, 8, 3])
+        faceNormals.push(normals.support1)
+        faceIndices.push([1, 3, 8])
+        faceNormals.push(normals.support2)
 
         // Face 2 external 
-        faceIndices.push([1, 2, 8])
+        faceIndices.push([0, 1, 9])
         faceNormals.push(normals.face2out)
-        faceIndices.push([1, 8, 2])
+        faceIndices.push([0, 9, 1])
         faceNormals.push(normals.face2in)
 
       })()
     })()
 
     ;(function createSTL(){
+      // return
+
       var stl = "solid " + name + "\n"
       var total = faceIndices.length
       var ii

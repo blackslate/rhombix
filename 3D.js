@@ -89,6 +89,11 @@ Vector.prototype.scalarMultiply = function scalarMultiply(scalar) {
   return this
 }
 
+Vector.prototype.angleBetween = function angleBetween(vector) {
+  var magnitude = this.magnitude() * vector.magnitude()
+  return Math.acos(this.dot(vector) / magnitude)
+}
+
 Vector.prototype.toString = function toString() {
   return "{ x: " + this.x + ", y: " + this.y + ", z: " + this.z + " }"
 }
@@ -162,11 +167,21 @@ Line.prototype.toString = function toString() {
 
   // console.log("u.dot(v) =", u.dot(v))
 
-  var a = new Line(new Vector(0, 0, 0), new Vector(1, 1, 0))
-  var b = new Line(new Vector(2, 0, 0), new Vector(0, 1, 0))
-  var c = a.closestPointTo(b)
+  // var a = new Line(new Vector(0, 0, 0), new Vector(1, 1, 0))
+  // var b = new Line(new Vector(2, 0, 0), new Vector(0, 1, 0))
+  // var c = a.closestPointTo(b)
 
-  console.log(c.toString())
+  // console.log(c.toString())
+
+  // var u = new Vector(10, 0, 0)
+  // var v = new Vector(0, 100, 0)
+  // var w = new Vector(Math.cos(Math.PI/6), 0, Math.sin(Math.PI/6))
+  // var angle = u.angleBetween(v)
+  // console.log(angle, angle *180 / Math.PI)
+  // angle = u.angleBetween(w)
+  // console.log(angle, angle *180 / Math.PI)
+  // angle = v.angleBetween(w)
+  // console.log(angle, angle *180 / Math.PI)
 })()
 
 
