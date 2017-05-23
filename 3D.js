@@ -118,9 +118,18 @@ function Line(point, direction, fromPoints) {
   this.direction = direction
 }
 
-Line.prototype.setFromPoints = function setFromPoints(start, end) {
-  this.point = start
-  this.direction = (end.clone().subtract(start)).normalize()
+Line.prototype.clone = function clone() {
+  return new Line(this.point, this.direction)
+}
+
+Line.prototype.setPoint = function setPoint(point) {
+  this.point = point
+
+  return this
+}
+
+Line.prototype.setDirection = function setDirection(direction) {
+  this.direction = direction
 
   return this
 }
@@ -145,6 +154,42 @@ Line.prototype.closestPointTo = function(line) {
 Line.prototype.toString = function toString() {
   return "point: " + this.point.toString()
      + ", direction" + this.direction.toString()
+}
+
+function Plane(point, pointOrNormal, pointOrUndefined) {
+  if (!pointOrUndefined) {
+    // Assume point + normal
+    if (!pointOrNormal) {
+      pointOrNormal = new Vector(0, 0, 1)
+    }
+
+    if (!point) {
+      point = new Vector(0, 0, 0)
+    }
+  } else {
+    // Assume all arguments are vectors, in anticlockwise order
+    pointOrNormal = pointOrNormal.clone().subtract(point)
+    pointOrUndefined = pointOrUndefined.clone().subtract(point)
+    pointOrNormal = pointOrNormal.cross(pointOrUndefined)
+                                 .normalize()
+  }
+
+  this.point = point
+  this.normal = pointOrNormal
+}
+
+Plane.prototype.intersectsLine = function intersectsLine(line) {
+  var vector = this.point.clone().subtract(line.point)
+  var hit = this.normal.dot(vector) 
+          / this.normal.dot(line.direction)
+  vector.copy(line.point).add(line.direction.scalarMultiply(hit))
+
+  return vector
+}
+
+Plane.prototype.toString = function toString() {
+  return "{ point: " + this.point.toString()
+       + ", normal: " + this.normal.toString() + " }"
 }
 
 ;(function tests(){
@@ -198,10 +243,18 @@ Line.prototype.toString = function toString() {
   // angle = v.angleBetween(w)
   // console.log(angle, angle *180 / Math.PI)
   // console.log(u.distanceTo(v), u.toString(), v.toString())
+  
+  // var plane = new Plane(new Vector(0, 0, 0)
+  //                        , new Vector(0, 0, 1))
+  // var line = new Line(new Vector(1, 1, 1)
+  //                       , new Vector(1, 1, 1))
+  // console.log(plane.toString(), line.toString())
+  // console.log(plane.intersectsLine(line))
 })()
 
 
 module.exports = {
   Vector: Vector
 , Line: Line
+, Plane: Plane
 }

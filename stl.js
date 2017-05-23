@@ -1,6 +1,11 @@
+"use strict"
+
 ;(function (){
+
   var fs = require("fs")
   var ЗD = require("./3D.js")
+
+  // return
 
   // <HARD-CODED>
   var scale = 4
@@ -46,6 +51,7 @@
 
   var vertices = []
   var normals = {}
+  var planes = {}
   var faceIndices = []
   var faceNormals = []
   var faces = []
@@ -137,7 +143,7 @@
            
             for (; ii-- ;) {
               startVertex = vertices[ii]
-              edge = new ЗD.Line().setFromPoints(startVertex, endVertex)
+              edge = new ЗD.Line(startVertex, endVertex, "fromPoints")
               // console.log(edge.toString())
 
               perpendicular = new ЗD.Vector(0, 0, 1)
@@ -179,22 +185,17 @@
           // back face, 2 x 2 edges, and a total of 6 in the gap
           // ABCD
           // 
-          // Front:           Back:
-          //        A                B
-          //       / \              / \
-          //     15–––16          22–––23
-          //     /|  /|\          /|  /|\
-          //    / | / | \        / | / | \
-          //   /  |/  |  \      /  |/  |  \
-          //  /   E———D   \    /   19—20   \
-          // 9————F   C————8  7————18 21————5  
-          // 
-          // The 20 triangles will be:
-          // Front: 9-A-15, B-C-16, B-16-15, D-14-16, 15-16-17
-          // Sides: 9-17-7, 24-7-17 : 14-5-17, 24-17-5
-          // Back:  7-18-22, 22-23-29, 20-19-23, 21-23-5, 22-24-23
-          // Gap: A-18-B, 19-B-18 : B-C-19, 20-19-C : D-C-21, 20-21-C
-
+          // x>               x<
+          //         A                 B
+          //        / \               / \
+          //      21–––20           23–––22
+          //      /|  /|\           /|  /|\
+          //     / | / | \         / | / | \
+          //    /  |/  |  \       /  |/  |  \
+          //   /  18———19  \     /  16———17  \
+          //  9————E   D————8   7————F   C————5
+          // 3_______________1
+          //                  
           // Find the centroid of the equilateral triangle which joins
           // the short diagonals of three faces at one peak, and the
           // normal for this triangle. Normal is unscaled.
@@ -206,67 +207,125 @@
             , line
             , bevelEdge
             , point
+            , plane
 
-          x = p/2 - x // from origin
+          ;(function createSupportOutline(){
+            x = p/2 - x // from origin
 
-          normal = new ЗD.Vector(x/3, 0, z/3)
-                         .subtract(new ЗD.Vector(p/2, 0, 0))
-                         .normalize()
-          normals.tipToCentroid = [normal.x, normal.y, normal.z]
-          normals.centroidToTip = [-normal.x, -normal.y, -normal.z]
-          
-          // Scale for centroid
-          centroid = new ЗD.Vector (x * edge / 3, 0, z * edge / 3)
+            normal = new ЗD.Vector(x/3, 0, z/3)
+                           .subtract(new ЗD.Vector(p/2, 0, 0))
+                           .normalize()
+            normals.tipToCentroid = [normal.x, normal.y, normal.z]
+            normals.centroidToTip = [-normal.x, -normal.y, -normal.z]
+            
+            // Scale for centroid
+            centroid = new ЗD.Vector (x * edge / 3, 0, z * edge / 3)
 
-          // Find where lines from ends of short diagonal cross the
-          // inner bevels
-          // x>0, y>0
-          line = new ЗD.Line(vertices[1], centroid, "fromPoints")
-          bevelEdge = lineMap.bevel_0
-          point = bevelEdge.closestPointTo(line)
+            // Find where lines from ends of short diagonal cross the
+            // inner bevels
+            // y>0
+            line = new ЗD.Line(centroid, vertices[1], "fromPoints")
+            lineMap.support1 = line
+            bevelEdge = lineMap.bevel_0
+            point = bevelEdge.closestPointTo(line)
+            vertices.push(point.clone()) // 8
 
-          // Distance to bevel corner is 118% of ply, so we can
-          // use the corner to give the magnet support thickness
-          // console.log(point.distanceTo(vertices[5]))
-          // // 4.702282018339723
+            lineMap.support5 = line.clone().setPoint(vertices[5])
 
-          vertices.push(point) // 8
+            // y<0
+            point.y = -point.y
+            vertices.push(point.clone()) // 9
 
-          // x>0, y<0
-          line.setFromPoints(vertices[3], centroid)
-          bevelEdge = lineMap.bevel_3
-          point = bevelEdge.closestPointTo(line)
-          vertices.push(point) // 9
+            vertices.push(centroid) // A
 
-          vertices.push(centroid) // 10
+            // Create a plane passing through points 1, 3 and A. Call
+            // it supportMore, because it is on the side where the
+            // values of x are more than on the other face
+            planes.supportMore = new ЗD.Plane(centroid, normal)
 
-          // Find point by centroid that gives thickness. The support
-          // will be ply thick at the base, but slightly thinner when
-          // considered in cross-section, because of the angle of the
-          // support. If we make it ply thick at the centroid, then it
-          // will get slightly thicker towards the point.
-          // 
-          // console.log(point.distanceTo(vertices[7])
-          //             *= Math.cos(acute / 2))
-          // // 3.9999999999999476
-          normal.scalarMultiply(ply) // pointing away from tip
-                .add(centroid)
-          vertices.push(normal) // 11 (normal temporarily repurposed)
+            // Create a parallel plane passing through points 5 and 7
+            plane = new ЗD.Plane(vertices[5], normal)
+            planes.supportLess = plane
 
-          // Normals for sides of magnet support
-          point = centroid.clone() // no longer in vertices
-                          .subtract(vertices[3]) // now a direction
-                          .normalize()
-          normal = bevelEdge.direction.cross(point) // bevel_3
-          normals.minusSide = [normal.x, normal.y, normal.z]
+            // A point on this new plane by the centroid            
+            line = new ЗD.Line(centroid, normal)
+            point = plane.intersectsLine(line)
+            vertices.push(point.clone()) // B
 
-          point.copy(centroid)
-               .subtract(vertices[1])
-               .normalize()
-          normal = lineMap.bevel_1.direction
-                                  .subtract(vertices[1])
-                                  .cross(centroid)
-          normals.plusSide = [normal.x, normal.y, normal.z]
+            // Normals for sides of magnet support, starting on the
+            // y>0 side
+            normal = bevelEdge.direction
+                              .cross(lineMap.support1.direction)
+            normals.plusSide = [normal.x, normal.y, normal.z]
+            normals.minusSide = [normal.x, -normal.y, normal.z]
+          })()
+
+          ;(function createGap(){
+            var xAxis = new ЗD.Vector(1, 0, 0)
+            var yAxis = new ЗD.Vector(0, 1, 0)
+            var rayOffset = new ЗD.Vector(-p, 0, magHeight) // -p arbitrary
+            var width
+              , offsetX
+              , line
+
+            normals.yAxis = yAxis
+            normals._yAxis = new ЗD.Vector(0, -1, 0)
+            normals.zAxis = new ЗD.Vector(0, 0, 1)
+            normals._zAxis = new ЗD.Vector(0, 0, -1)
+
+            // Bottom, less face
+            point.copy(vertices[5])
+            width = (point.distanceTo(vertices[7]) - magWidth) / 2
+            offsetX = new ЗD.Vector(0, width, 0)
+
+            point.subtract(offsetX)
+            vertices.push(point.clone()) // C
+
+            planes.gap = new ЗD.Plane(point, new ЗD.Vector(0, -1, 0))
+
+            line = new ЗD.Line(point, xAxis)
+            point = planes.supportMore.intersectsLine(line)
+            vertices.push(point.clone()) // D
+
+            point.y = -point.y
+            vertices.push(point.clone()) // E
+
+            point.copy(vertices[12]) // (C)
+            point.y = -point.y
+            vertices.push(point.clone()) // F
+
+            // Top
+            point.add(rayOffset)
+            line.setPoint(point)                           
+            point = planes.supportLess.intersectsLine(line)
+            vertices.push(point.clone()) // 16
+
+            point.y = -point.y
+            vertices.push(point.clone()) // 17
+
+            point = planes.supportMore.intersectsLine(line)
+            vertices.push(point.clone()) // 18
+
+            point.y = -point.y
+            vertices.push(point.clone()) // 19
+
+            // Apex
+            line = lineMap.support1
+            plane = planes.gap
+            point = plane.intersectsLine(line)
+            vertices.push(point.clone()) // 20
+
+            point.y = -point.y
+            vertices.push(point.clone()) // 21
+
+            line = lineMap.support5
+            point = plane.intersectsLine(line)
+            vertices.push(point.clone()) // 22
+
+            point.y = -point.y
+            vertices.push(point.clone()) // 23
+
+          })()
         }  
 
 
@@ -340,16 +399,71 @@
 
         // Faces for top
         normal = [0, 0, 1]
-        faceIndices.push([7, 4, 5])
+        faceIndices.push([9, 4, 8])
         faceNormals.push(normal)
         faceIndices.push([7, 5, 6])
         faceNormals.push(normal)
 
         // Magnet support   
-        faceIndices.push([8, 10, 9]) // tip side
-        faceNormals.push(normals.centroidToTip)
-        faceIndices.push([5, 7, 11]) // centre side
-        faceNormals.push(normals.tipToCentroid)
+        // x>               x<
+        //         A                 B
+        //        / \               / \
+        //      21–––20           23–––22
+        //      /|  /|\           /|  /|\
+        //     / | / | \         / | / | \
+        //    /  |/  |  \       /  |/  |  \
+        //   /  18———19  \     /  16———17  \
+        //  9————E   D————8   7————F   C————5
+        // 3_______________1
+
+        // supportMore (tip side)
+        normal = normals.centroidToTip
+        faceIndices.push([8, 20, 13])
+        faceNormals.push(normal)
+        faceIndices.push([9, 14, 21])
+        faceNormals.push(normal)
+        faceIndices.push([10, 21, 20])
+        faceNormals.push(normal)
+        faceIndices.push([18, 20, 21])
+        faceNormals.push(normal)
+        faceIndices.push([19, 20, 18])
+        faceNormals.push(normal)
+        // supportLess
+        normal = normals.tipToCentroid
+        faceIndices.push([5, 12, 22])
+        faceNormals.push(normal)
+        faceIndices.push([7, 23, 15])
+        faceNormals.push(normal)
+        faceIndices.push([11, 22, 23])
+        faceNormals.push(normal)
+        faceIndices.push([16, 23, 22])
+        faceNormals.push(normal)
+        faceIndices.push([17, 16, 22])
+        faceNormals.push(normal)
+        // gap less
+        normal = normals.yAxis
+        faceIndices.push([14, 15, 16])
+        faceNormals.push(normal)
+        faceIndices.push([14, 16, 18])
+        faceNormals.push(normal)
+        //gap more
+        normal = normals._yAxis
+        faceIndices.push([12, 13, 19])
+        faceNormals.push(normal)
+        faceIndices.push([12, 19, 17])
+        faceNormals.push(normal)
+        // gap bottom
+        normal = normals.zAxis
+        faceIndices.push([15, 14, 13])
+        faceNormals.push(normal)
+        faceIndices.push([15, 13, 12])
+        faceNormals.push(normal)
+        // gap top
+        normal = normals._zAxis
+        faceIndices.push([16, 17, 19])
+        faceNormals.push(normal)
+        faceIndices.push([16, 19, 18])
+        faceNormals.push(normal)
         // edges  
         faceIndices.push([5, 11, 8]) // plus side
         faceNormals.push(normals.plusSide)
