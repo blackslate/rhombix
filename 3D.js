@@ -40,9 +40,7 @@ Vector.prototype.cross = function cross(vector) {
   var y = this.z * vector.x - this.x * vector.z
   var z = this.x * vector.y - this.y * vector.x
 
-  this.set(x, y, z)
-
-  return this
+  return new Vector(x, y, z)
 }
 
 Vector.prototype.dot = function dot(vector) {
@@ -89,6 +87,14 @@ Vector.prototype.scalarMultiply = function scalarMultiply(scalar) {
   return this
 }
 
+Vector.prototype.distanceTo = function distanceTo(point) {
+  var x = point.x - this.x
+  var y = point.y - this.y
+  var z = point.z - this.z
+
+  return Math.sqrt(x * x + y * y + z * z)
+}
+
 Vector.prototype.angleBetween = function angleBetween(vector) {
   var magnitude = this.magnitude() * vector.magnitude()
   return Math.acos(this.dot(vector) / magnitude)
@@ -98,9 +104,18 @@ Vector.prototype.toString = function toString() {
   return "{ x: " + this.x + ", y: " + this.y + ", z: " + this.z + " }"
 }
 
-function Line(point, direction) {
+function Line(point, direction, fromPoints) {
+  direction = direction || new Vector(0, 0, 0)
+
   this.point = point || new Vector(0, 0, 0)
-  this.direction = direction || new Vector(0, 0, 0)
+
+  if (fromPoints) {
+    direction = direction.clone()
+               .subtract(point)
+               .normalize()
+  }
+
+  this.direction = direction
 }
 
 Line.prototype.setFromPoints = function setFromPoints(start, end) {
@@ -174,7 +189,7 @@ Line.prototype.toString = function toString() {
   // console.log(c.toString())
 
   // var u = new Vector(10, 0, 0)
-  // var v = new Vector(0, 100, 0)
+  // var v = new Vector(0, 10, 0)
   // var w = new Vector(Math.cos(Math.PI/6), 0, Math.sin(Math.PI/6))
   // var angle = u.angleBetween(v)
   // console.log(angle, angle *180 / Math.PI)
@@ -182,6 +197,7 @@ Line.prototype.toString = function toString() {
   // console.log(angle, angle *180 / Math.PI)
   // angle = v.angleBetween(w)
   // console.log(angle, angle *180 / Math.PI)
+  // console.log(u.distanceTo(v), u.toString(), v.toString())
 })()
 
 

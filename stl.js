@@ -70,7 +70,7 @@
 
     ;(function prepareAcuteRhombus(){
       ;(function createVertices(){
-        var bevelLineArray = [] // [<Line>, <Line>, <Line>, <Line>]
+        var lineMap = {} // {bevel45: <Line>, ...}
 
         // Exterior vertices for rhombus
         vertices.push(new ЗD.Vector(offsetX, 0, 0))
@@ -117,21 +117,23 @@
           if (pointIndex) {
             angles.unshift(angles.pop())
           }
-          populateBevelLineArray()
+          addBevelsToLineMap()
           calculateInnerPoints()
 
           vertices = vertices.concat(innerPoints)
 
           // console.log(vertices)
 
-          function populateBevelLineArray() {
-            var endVertex = vertices[0]
+          function addBevelsToLineMap() {
+            var endIndex = 0
+            var endVertex = vertices[endIndex]
             var ii = vertices.length
 
             var startVertex
             var edge
               , perpendicular
               , tan
+              , name
            
             for (; ii-- ;) {
               startVertex = vertices[ii]
@@ -146,24 +148,27 @@
 
               edge.point =  perpendicular.add(edge.point)
                                          .add(new ЗD.Vector(0, 0, ply))
-              bevelLineArray.unshift(edge)
+              name = "bevel_" + ii
+              lineMap[name] = edge
 
               endVertex = startVertex
+              endIndex = ii
             }
           }
 
           function calculateInnerPoints() {
-            var total = bevelLineArray.length
-            var other = bevelLineArray.slice(-1)[0] // above vertex 3
+            var bevel = lineMap.bevel_3
             var ii
+              , name
               , line
               , point
             
-            for (ii = 0; ii<total; ii += 1) {
-              line = bevelLineArray[ii]
-              point = line.closestPointTo(other)
+            for (ii = 0; ii<4; ii += 1) {
+              name = "bevel_" + ii
+              line = lineMap[name]
+              point = line.closestPointTo(bevel)
               innerPoints[ii] = line.point = point
-              other = line
+              bevel = line
             }
           }
         }
@@ -175,57 +180,93 @@
           // ABCD
           // 
           // Front:           Back:
-          //        17               24
+          //        A                B
           //       / \              / \
           //     15–––16          22–––23
           //     /|  /|\          /|  /|\
           //    / | / | \        / | / | \
           //   /  |/  |  \      /  |/  |  \
-          //  /   B———C   \    /   19—20   \
-          // 9————A   D————14 7————18 21————5
+          //  /   E———D   \    /   19—20   \
+          // 9————F   C————8  7————18 21————5  
           // 
           // The 20 triangles will be:
           // Front: 9-A-15, B-C-16, B-16-15, D-14-16, 15-16-17
           // Sides: 9-17-7, 24-7-17 : 14-5-17, 24-17-5
           // Back:  7-18-22, 22-23-29, 20-19-23, 21-23-5, 22-24-23
           // Gap: A-18-B, 19-B-18 : B-C-19, 20-19-C : D-C-21, 20-21-C
-          
-          // var top = bevelLineArray[1]    // vertex 5
-          // var bottom = bevelLineArray[3] // vertex 7
 
-          // // Thickness of support triangle
-          // var direction = top.direction.clone().scalarMultiply(ply)
-          // var vertex = top.point.clone().subtract(direction)
-          // vertices.push(vertex)
-
-          // direction.copy(top.direction).scalarMultiply(ply)
-          // vertex.copy(bottom.point).subtract(direction)
-          // vertices.push(vertex)
-
-          // First draft: one third of an equilateral triangle with
-          // its base along the short diagonal of the rhombus to the 
-          // centre between short diagonals on adjacent faces.
+          // Find the centroid of the equilateral triangle which joins
+          // the short diagonals of three faces at one peak, and the
+          // normal for this triangle. Normal is unscaled.
 
           var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
           var z = Math.sqrt(1 - x * x)
-          var vertex
-            , normal
-            , peak
+          var normal
             , centroid
+            , line
+            , bevelEdge
+            , point
 
           x = p/2 - x // from origin
 
-          normal = new ЗD.Vector(x/3, 0, z/3) // unscaled
-          normals.support1 = [normal.x, normal.y, normal.z]
-          normals.support2 = [-normal.x, -normal.y, -normal.z]
+          normal = new ЗD.Vector(x/3, 0, z/3)
+                         .subtract(new ЗD.Vector(p/2, 0, 0))
+                         .normalize()
+          normals.tipToCentroid = [normal.x, normal.y, normal.z]
+          normals.centroidToTip = [-normal.x, -normal.y, -normal.z]
           
-          x *= edge
-          z *= edge
+          // Scale for centroid
+          centroid = new ЗD.Vector (x * edge / 3, 0, z * edge / 3)
 
-          /// vertex = new ЗD.Vector (x, 0, z)
-          vertex = new ЗD.Vector (x/3, 0, z/3)
+          // Find where lines from ends of short diagonal cross the
+          // inner bevels
+          // x>0, y>0
+          line = new ЗD.Line(vertices[1], centroid, "fromPoints")
+          bevelEdge = lineMap.bevel_0
+          point = bevelEdge.closestPointTo(line)
 
-          vertices.push(vertex)
+          // Distance to bevel corner is 118% of ply, so we can
+          // use the corner to give the magnet support thickness
+          // console.log(point.distanceTo(vertices[5]))
+          // // 4.702282018339723
+
+          vertices.push(point) // 8
+
+          // x>0, y<0
+          line.setFromPoints(vertices[3], centroid)
+          bevelEdge = lineMap.bevel_3
+          point = bevelEdge.closestPointTo(line)
+          vertices.push(point) // 9
+
+          vertices.push(centroid) // 10
+
+          // Find point by centroid that gives thickness. The support
+          // will be ply thick at the base, but slightly thinner when
+          // considered in cross-section, because of the angle of the
+          // support. If we make it ply thick at the centroid, then it
+          // will get slightly thicker towards the point.
+          // 
+          // console.log(point.distanceTo(vertices[7])
+          //             *= Math.cos(acute / 2))
+          // // 3.9999999999999476
+          normal.scalarMultiply(ply) // pointing away from tip
+                .add(centroid)
+          vertices.push(normal) // 11 (normal temporarily repurposed)
+
+          // Normals for sides of magnet support
+          point = centroid.clone() // no longer in vertices
+                          .subtract(vertices[3]) // now a direction
+                          .normalize()
+          normal = bevelEdge.direction.cross(point) // bevel_3
+          normals.minusSide = [normal.x, normal.y, normal.z]
+
+          point.copy(centroid)
+               .subtract(vertices[1])
+               .normalize()
+          normal = lineMap.bevel_1.direction
+                                  .subtract(vertices[1])
+                                  .cross(centroid)
+          normals.plusSide = [normal.x, normal.y, normal.z]
         }  
 
 
@@ -260,7 +301,7 @@
 
           vertex = new ЗD.Vector (x * edge, 0, z * edge)
 
-          vertices.push(vertex)
+          vertices.push(vertex) // 11
         }        
       })()
 
@@ -304,17 +345,26 @@
         faceIndices.push([7, 5, 6])
         faceNormals.push(normal)
 
-        // Equilateral triangle   
-        faceIndices.push([1, 8, 3])
-        faceNormals.push(normals.support1)
-        faceIndices.push([1, 3, 8])
-        faceNormals.push(normals.support2)
+        // Magnet support   
+        faceIndices.push([8, 10, 9]) // tip side
+        faceNormals.push(normals.centroidToTip)
+        faceIndices.push([5, 7, 11]) // centre side
+        faceNormals.push(normals.tipToCentroid)
+        // edges  
+        faceIndices.push([5, 11, 8]) // plus side
+        faceNormals.push(normals.plusSide)
+        faceIndices.push([10, 8, 11])
+        faceNormals.push(normals.plusSide)
+        faceIndices.push([7, 9, 10]) // minus side
+        faceNormals.push(normals.minusSide)
+        faceIndices.push([11, 7, 10])
+        faceNormals.push(normals.minusSide)
 
-        // Face 2 external 
-        faceIndices.push([0, 1, 9])
-        faceNormals.push(normals.face2out)
-        faceIndices.push([0, 9, 1])
-        faceNormals.push(normals.face2in)
+        // // Face 2 external 
+        // faceIndices.push([0, 1, 12])
+        // faceNormals.push(normals.face2out)
+        // faceIndices.push([0, 12, 1])
+        // faceNormals.push(normals.face2in)
 
       })()
     })()
