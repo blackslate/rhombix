@@ -334,12 +334,12 @@
         }
 
         /**
-         * Adds two blocks along each edge, separated by the space of
+         * Adds six blocks along each edge, separated by the space of
          * one block, and with a one-block gap at the end. There will
-         * be a length equivalent to the width of the blocks at either
+         * be a length equivalent to 3 x the width of blocks at either
          * end.
          * 
-         * The blocks are slightly dovetailed so that they snap
+         * The blocks may be slightly dovetailed so that they snap
          * together with the blocks on another face.
          */
         function addClipBlocks() {
@@ -362,14 +362,18 @@
           // Unit vectors
           var offsetU = lineMap.bevel_0.direction
           var offsetV = lineMap.bevel_3.direction
+          var _offsetU = offsetU.clone().reverse()
+          var _offsetV = offsetV.clone().reverse()
           // Scaled vectors
           var blockU = offsetU.clone().scalarMultiply(blockWidth)
           var blockV = offsetV.clone().scalarMultiply(blockWidth)
+          var _blockU = blockU.clone().reverse()
+          var _blockV = blockV.clone().reverse()
           // Normals
           var uNormal = offsetU.toArray()
           var vNormal = offsetV.toArray()
-          var _uNormal = offsetU.clone().reverse().toArray()
-          var _vNormal = offsetV.clone().reverse().toArray()
+          var _uNormal = _offsetU.toArray()
+          var _vNormal =_offsetV.toArray()
           // Scalar
           var spacing = (lineMap.bevel_0.point
                                  .distanceTo(lineMap.bevel_1.point)
@@ -433,32 +437,7 @@
                  .add(blockU) // bigger gap
             ray = new ЗD.Line(point.clone(), offsetV)
 
-            //   26——27 \
-            //    \ / \  \
-            // ___24__25  \
-            // _________°*®.
-            
-            for (ii = 0; ii < blockCount; ii += 1) {
-              vertices.push(point.clone()) // 24 + 4ii
-
-              inner = innerPlane.intersectsLine(ray)
-              vertices.push(inner) // 25 + 4ii
-
-              upper = point.clone().add(blockZ)
-              vertices.push(upper) // 26 + 4ii
-
-              ray.setPoint(upper)
-              vertices.push(innerPlane.intersectsLine(ray)) // 27 + 4ii
-
-              point.add(spacingOffset)
-              ray.setPoint(point)
-            }
-
-            // End the final space
-            vertices.push(point.clone()) // 32 + 4ii
-
-            inner = innerPlane.intersectsLine(ray)
-            vertices.push(inner) // 33 + 4ii                                
+            addBlocks(innerPlane, ray, point, spacingOffset)                        
           })()
 
           ;(function southEastEdge(){
@@ -481,56 +460,84 @@
                  .add(blockV)                 // bigger gap
             ray = new ЗD.Line(point.clone(), offsetU) // U not V
 
+            addBlocks(innerPlane, ray, point, spacingOffset)                     
+          })()
+
+          ;(function northWestEdge(){
+            point = vertices[5].clone()
+
+            // Create inner plane for ray casting
+            normal = offsetV.cross(blockZ)
+                            .normalize()
+            point.add(_blockU)
+            innerPlane = new ЗD.Plane(point.clone(), normal)
+
+            spacingOffset = _offsetV.clone()
+                                   .scalarMultiply(spacing)
+
+            // Leave a blockWidth gap before the first block
+            point.copy(lineMap.bevel_1.point)
+                 .add(_blockV)
+                 .add(_blockV)
+                 .add(_blockV) // bigger gap
+            ray = new ЗD.Line(point.clone(), _offsetU)
+
+            addBlocks(innerPlane, ray, point, spacingOffset)          
+          })()
+
+          ;(function southWestEdge(){
+            point = vertices[6].clone()
+
+            // Create inner plane for ray casting
+            normal = offsetU.cross(blockZ)
+                            .normalize()
+            point.add(blockV)
+            innerPlane = new ЗD.Plane(point.clone(), normal)
+
+            spacingOffset = _offsetU.clone()
+                                   .scalarMultiply(spacing)
+
+            // Leave a blockWidth gap before the first block
+            point.copy(lineMap.bevel_2.point)
+                 .add(_blockU)
+                 .add(_blockU)
+                 .add(_blockU) // bigger gap
+            ray = new ЗD.Line(point.clone(), offsetV)
+
+            addBlocks(innerPlane, ray, point, spacingOffset)          
+          })()
+
+          function addBlocks(innerPlane, ray, point, spacingOffset) {
+            var inner
+              , upper
+
             //   26——27 \
             //    \ / \  \
             // ___24__25  \
             // _________°*®.
-                      
+            
             for (ii = 0; ii < blockCount; ii += 1) {
-              vertices.push(point.clone()) // 24 + 4ii
-
               inner = innerPlane.intersectsLine(ray)
-              vertices.push(inner) // 25 + 4ii
+              vertices.push(inner) // 24 + 4ii
+
+              vertices.push(point.clone()) // 25 + 4ii
 
               upper = point.clone().add(blockZ)
-              vertices.push(upper) // 26 + 4ii
 
               ray.setPoint(upper)
-              vertices.push(innerPlane.intersectsLine(ray)) // 27 + 4ii
+              vertices.push(innerPlane.intersectsLine(ray)) // 26 + 4ii
+
+              vertices.push(upper) // 27 + 4ii
 
               point.add(spacingOffset)
               ray.setPoint(point)
             }
 
             // End the final space
-            vertices.push(point.clone()) // 32 + 4ii
-
             inner = innerPlane.intersectsLine(ray)
-            vertices.push(inner) // 33 + 4ii    
-                                 // 
-            // for (ii = 0; ii < blockCount; ii += 1) {
-            //   inner = innerPlane.intersectsLine(ray)
-            //   vertices.push(inner) // was second
-
-            //   vertices.push(point.clone()) // was first
-
-            //   upper = point.clone().add(blockZ)
-
-            //   ray.setPoint(upper)
-            //   vertices.push(innerPlane.intersectsLine(ray)) // was 4th
-
-            //   vertices.push(upper) // was third
-
-            //   point.add(spacingOffset)
-            //   ray.setPoint(point)
-            // }
-
-            // // End the final space
-            // inner = innerPlane.intersectsLine(ray)
-            // vertices.push(inner) // was last
-
-            // vertices.push(point.clone()) // was second-last                        
-          })()
+            vertices.push(inner) // 32 + 4ii
+            vertices.push(point.clone()) // 33 + 4ii
+          }  
         }
 
         function addWitnessFace() {
@@ -702,7 +709,7 @@
         // _open_*24__25    28___24  25__29   29__28   30__26  32__28
         // _____________*.
        
-        for (jj = 0; jj < 2; jj += 1) { // will be 4 edges
+        for (jj = 0; jj < 4; jj += 1) { // will be 4 edges
           normals = normalArray[jj]
           
           for (ii = 0; ii < total; ii += 1) {
