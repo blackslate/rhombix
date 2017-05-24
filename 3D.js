@@ -100,8 +100,20 @@ Vector.prototype.angleBetween = function angleBetween(vector) {
   return Math.acos(this.dot(vector) / magnitude)
 }
 
+Vector.prototype.reverse = function reverse(vector) {
+  this.x = -this.x
+  this.y = -this.y
+  this.z = -this.z
+
+  return this
+}
+
 Vector.prototype.toString = function toString() {
   return "{ x: " + this.x + ", y: " + this.y + ", z: " + this.z + " }"
+}
+
+Vector.prototype.toArray = function toArray() {
+  return [this.x, this.y, this.z]
 }
 
 function Line(point, direction, fromPoints) {
@@ -182,7 +194,9 @@ Plane.prototype.intersectsLine = function intersectsLine(line) {
   var vector = this.point.clone().subtract(line.point)
   var hit = this.normal.dot(vector) 
           / this.normal.dot(line.direction)
-  vector.copy(line.point).add(line.direction.scalarMultiply(hit))
+  vector.copy(line.point)
+        .add(line.direction.clone()
+                           .scalarMultiply(hit))
 
   return vector
 }

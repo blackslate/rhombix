@@ -13,10 +13,14 @@
   var magWidth = 10 * scale
   var magHeight = 3 * scale
   var ply = 1 * scale
+  var blockWidth = ply
+  var blockCount = 6 * 2 // must be an even number
 
   var vFile = "v"
   var path = "output/"
   var name = "acute"
+
+  var showWitnessFace = false
   // </HARD-CODED>
 
   var sqrt5 = Math.sqrt(5)
@@ -32,25 +36,25 @@
   // 1.1071487177940904 radians 63.43494882292201°
   
   // Angles between faces 
-  var _18degrees = Math.PI / 10 // thin bevel of flat rhombohedron
+  var _18degrees = Math.PI / 10 // side bevel of flat rhombohedron
   // 0.3141592653589793 radians 18°
-  var _36degrees = _18degrees * 2// point bevel of pointy rhombohedron
+  var _36degrees = _18degrees * 2// crown bevel of pointy rhombohedron
   // 0.6283185307179586 radians 36°
   var _54degrees = _18degrees * 3// side bevel of pointy rhombohedron
   // 0.9424777960769379 radians 54°
-  
-  var _72degrees = _36degrees * 2 // point of pointy rhombohedron
+  var _72degrees = _36degrees * 2 // crown of flat rhombohedron
   // 1.2566370614359172 radians 72°
-  var _108degrees = _36degrees * 3
-  // 1.8849555921538759 radians 108°// side of pointy rhombohedron
-  var _144degrees = _36degrees * 4
-  // 2.5132741228718345 radians 144° // dome of flat rhombohedron
+
+  // var _108degrees = _36degrees * 3
+  // // 1.8849555921538759 radians 108°// side of pointy rhombohedron
+  // var _144degrees = _36degrees * 4
+  // // 2.5132741228718345 radians 144° // dome of flat rhombohedron
 
   var offsetX = p/2 * edge
   var offsetY = q/2 * edge
 
   var vertices = []
-  var normals = {}
+  var normalMap = {}
   var planes = {}
   var faceIndices = []
   var faceNormals = []
@@ -58,19 +62,19 @@
   var normal
   var face
 
-  var v 
+  var version
 
   fs.readFile(vFile, versionIt)
 
   function versionIt(error, data) {
     if (error) {
-      v = "001"
+      version = "001"
     } else {
-      v = parseInt(data, 10) + 1
-      if (v < 10) {
-        v = "00" + v
-      } else if (v < 100) {
-        v = "0" + v
+      version = parseInt(data, 10) + 1
+      if (version < 10) {
+        version = "00" + version
+      } else if (version < 100) {
+        version = "0" + version
       }
     }
 
@@ -90,6 +94,8 @@
         
         addMagnetSupport()
 
+        addClipBlocks()
+
         addWitnessFace()
 
         /* BEVELS *
@@ -98,7 +104,7 @@
           // types in four different places:
           // Bevels:
           // - Between adjacent faces (36° for acute, 72° for obtuse)
-          // - Where the sides connect (108° for acute, 18° for obtuse)
+          // - Where the sides connect (54° for acute, 18° for obtuse)
           // Intersection types:
           // - Where adjacent faces meet at the crown
           // - At the VV armpits in the middle (x2 = left and right)
@@ -107,7 +113,6 @@
           // inner tip and outermost points of the rhombus meet on the
           // diagonal.
         */
-
         function addInteriorVertices(pointIndex, innerAngle, outerAngle) {
           // Bevels:
           // - innerAngle between adjacent faces
@@ -215,8 +220,8 @@
             normal = new ЗD.Vector(x/3, 0, z/3)
                            .subtract(new ЗD.Vector(p/2, 0, 0))
                            .normalize()
-            normals.tipToCentroid = [normal.x, normal.y, normal.z]
-            normals.centroidToTip = [-normal.x, -normal.y, -normal.z]
+            normalMap.tipToCentroid = [normal.x, normal.y, normal.z]
+            normalMap.centroidToTip = [-normal.x,-normal.y,-normal.z]
             
             // Scale for centroid
             centroid = new ЗD.Vector (x * edge / 3, 0, z * edge / 3)
@@ -256,22 +261,22 @@
             // y>0 side
             normal = bevelEdge.direction
                               .cross(lineMap.support1.direction)
-            normals.plusSide = [normal.x, normal.y, normal.z]
-            normals.minusSide = [normal.x, -normal.y, normal.z]
+            normalMap.plusSide = [normal.x, normal.y, normal.z]
+            normalMap.minusSide = [normal.x, -normal.y, normal.z]
           })()
 
           ;(function createGap(){
             var xAxis = new ЗD.Vector(1, 0, 0)
             var yAxis = new ЗD.Vector(0, 1, 0)
-            var rayOffset = new ЗD.Vector(-p, 0, magHeight) // -p arbitrary
+            var rayOffset = new ЗD.Vector(0, 0, magHeight)
             var width
               , offsetX
               , line
 
-            normals.yAxis = yAxis
-            normals._yAxis = new ЗD.Vector(0, -1, 0)
-            normals.zAxis = new ЗD.Vector(0, 0, 1)
-            normals._zAxis = new ЗD.Vector(0, 0, -1)
+            normalMap.yAxis = [yAxis.x, yAxis.y, yAxis.z]
+            normalMap._yAxis = [0, -1, 0]
+            normalMap.zAxis = [0, 0, 1]
+            normalMap._zAxis = [0, 0, -1]
 
             // Bottom, less face
             point.copy(vertices[5])
@@ -326,10 +331,213 @@
             vertices.push(point.clone()) // 23
 
           })()
-        }  
+        }
 
+        /**
+         * Adds two blocks along each edge, separated by the space of
+         * one block, and with a one-block gap at the end. There will
+         * be a length equivalent to the width of the blocks at either
+         * end.
+         * 
+         * The blocks are slightly dovetailed so that they snap
+         * together with the blocks on another face.
+         */
+        function addClipBlocks() {
+          // Create two planes parallel with the adjacent face, one
+          // at the lip of the bevel, one 1-block-width further in.
+          // Create a line to intersect this plane, parallel to the
+          // preceding adjacent face. Move this line to 8 different
+          // positions corresponding to the corners of the blocks, and
+          // detect the intersection points with the planes, to give
+          // the vertices of the blocks. Add these vertices to the
+          // vertices array. The facets will be stitched together in
+          // the createFaces function.
+          // 
+          // This operation needs to be done twice: once with each
+          // bevel angle. The vertex points can be mirrored to the
+          // opposite side after each operation.
+
+          var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
+          var z = Math.sqrt(1 - x * x)
+          // Unit vectors
+          var offsetU = lineMap.bevel_0.direction
+          var offsetV = lineMap.bevel_3.direction
+          // Scaled vectors
+          var blockU = offsetU.clone().scalarMultiply(blockWidth)
+          var blockV = offsetV.clone().scalarMultiply(blockWidth)
+          // Normals
+          var uNormal = offsetU.toArray()
+          var vNormal = offsetV.toArray()
+          var _uNormal = offsetU.clone().reverse().toArray()
+          var _vNormal = offsetV.clone().reverse().toArray()
+          // Scalar
+          var spacing = (lineMap.bevel_0.point
+                                 .distanceTo(lineMap.bevel_1.point)
+                        - 6 * blockWidth) / blockCount // bigger gap
+          var blockZ
+            , normal
+            , spacingOffset
+            , point, inner, upper
+            , innerPlane
+            , ray
+            , total
+            , ii  
+
+          // Prepare normals for blocks
+          normalMap.blocks = [
+            { open:  _uNormal
+            , inner: _vNormal
+            , outer:  vNormal
+            , close:  uNormal
+            }
+          , { open:  _vNormal
+            , inner:  uNormal
+            , outer: _uNormal
+            , close:  vNormal
+            }
+          , { open:   vNormal
+            , inner: _uNormal
+            , outer:  uNormal
+            , close: _vNormal
+            }
+          , { open:  _uNormal
+            , inner:  vNormal
+            , outer: _vNormal
+            , close:  uNormal
+            }
+          ]
+
+          // Get angle of east ridge
+          x = p/2 - x // from origin
+          blockZ = new ЗD.Vector (x * edge, 0, z * edge) // peak point
+          blockZ.subtract(vertices[0]) // direction
+                   .normalize()
+                   .scalarMultiply(blockWidth)
+
+          ;(function northEastEdge(){
+            point = vertices[4].clone()
+
+            // Create inner plane for ray casting
+            normal = blockZ.cross(offsetU)
+                           .normalize()
+            point.subtract(blockV)
+            innerPlane = new ЗD.Plane(point.clone(), normal)
+
+            spacingOffset = offsetU.clone()
+                                   .scalarMultiply(spacing)
+
+            // Leave a blockWidth gap before the first block
+            point.copy(lineMap.bevel_0.point)
+                 .add(blockU)
+                 .add(blockU)
+                 .add(blockU) // bigger gap
+            ray = new ЗD.Line(point.clone(), offsetV)
+
+            //   26——27 \
+            //    \ / \  \
+            // ___24__25  \
+            // _________°*®.
+            
+            for (ii = 0; ii < blockCount; ii += 1) {
+              vertices.push(point.clone()) // 24 + 4ii
+
+              inner = innerPlane.intersectsLine(ray)
+              vertices.push(inner) // 25 + 4ii
+
+              upper = point.clone().add(blockZ)
+              vertices.push(upper) // 26 + 4ii
+
+              ray.setPoint(upper)
+              vertices.push(innerPlane.intersectsLine(ray)) // 27 + 4ii
+
+              point.add(spacingOffset)
+              ray.setPoint(point)
+            }
+
+            // End the final space
+            vertices.push(point.clone()) // 32 + 4ii
+
+            inner = innerPlane.intersectsLine(ray)
+            vertices.push(inner) // 33 + 4ii                                
+          })()
+
+          ;(function southEastEdge(){
+            point = vertices[7].clone() // 7 not 4
+
+            // Create inner plane for ray casting (+ U, not -V)
+            normal = blockZ.cross(offsetV) // V not U
+                            .normalize()
+            point.add(blockU)
+            innerPlane = new ЗD.Plane(point.clone(), normal)
+
+            // Set block dimensions
+            spacingOffset = offsetV.clone() // V not U
+                                   .scalarMultiply(spacing)
+
+            // Leave a blockWidth gap before the first block
+            point.copy(lineMap.bevel_3.point) // 3 not 0
+                 .add(blockV)                 // V not U
+                 .add(blockV)                 //
+                 .add(blockV)                 // bigger gap
+            ray = new ЗD.Line(point.clone(), offsetU) // U not V
+
+            //   26——27 \
+            //    \ / \  \
+            // ___24__25  \
+            // _________°*®.
+                      
+            for (ii = 0; ii < blockCount; ii += 1) {
+              vertices.push(point.clone()) // 24 + 4ii
+
+              inner = innerPlane.intersectsLine(ray)
+              vertices.push(inner) // 25 + 4ii
+
+              upper = point.clone().add(blockZ)
+              vertices.push(upper) // 26 + 4ii
+
+              ray.setPoint(upper)
+              vertices.push(innerPlane.intersectsLine(ray)) // 27 + 4ii
+
+              point.add(spacingOffset)
+              ray.setPoint(point)
+            }
+
+            // End the final space
+            vertices.push(point.clone()) // 32 + 4ii
+
+            inner = innerPlane.intersectsLine(ray)
+            vertices.push(inner) // 33 + 4ii    
+                                 // 
+            // for (ii = 0; ii < blockCount; ii += 1) {
+            //   inner = innerPlane.intersectsLine(ray)
+            //   vertices.push(inner) // was second
+
+            //   vertices.push(point.clone()) // was first
+
+            //   upper = point.clone().add(blockZ)
+
+            //   ray.setPoint(upper)
+            //   vertices.push(innerPlane.intersectsLine(ray)) // was 4th
+
+            //   vertices.push(upper) // was third
+
+            //   point.add(spacingOffset)
+            //   ray.setPoint(point)
+            // }
+
+            // // End the final space
+            // inner = innerPlane.intersectsLine(ray)
+            // vertices.push(inner) // was last
+
+            // vertices.push(point.clone()) // was second-last                        
+          })()
+        }
 
         function addWitnessFace() {
+          if (!showWitnessFace) {
+            return
+          }
+
           // Unscaled
           var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
           var z = Math.sqrt(1 - x * x)
@@ -343,11 +551,10 @@
 
           peak = new ЗD.Vector(x, 0, z)
           side = new ЗD.Vector(p, q, 0)
-          normal = peak.clone()
-                       .cross(side)
+          normal = peak.cross(side)
                        .normalize()
-          normals.face2out = [normal.x, normal.y, normal.z] 
-          normals.face2in  = [-normal.x, -normal.y, -normal.z]
+          normalMap.face2out = [normal.x, normal.y, normal.z] 
+          normalMap.face2in  = [-normal.x, -normal.y, -normal.z]
 
           // var temp = peak.clone()
           //                .subtract(new ЗD.Vector(0, q/2, 0))
@@ -360,11 +567,21 @@
 
           vertex = new ЗD.Vector (x * edge, 0, z * edge)
 
-          vertices.push(vertex) // 11
+          vertices.push(vertex) // 24
         }        
       })()
 
       ;(function createFaces(){
+        // Variables for blocks (whose number may be set)
+        var odd = true
+        var normalArray = normalMap.blocks
+        var index = 24
+        var total = blockCount / 2
+        var end
+          , normals
+          , ii
+          , jj
+
         // Faces for exterior
         normal = [0, 0, -1]
         faceIndices.push([1, 0, 3])
@@ -417,7 +634,7 @@
         // 3_______________1
 
         // supportMore (tip side)
-        normal = normals.centroidToTip
+        normal = normalMap.centroidToTip
         faceIndices.push([8, 20, 13])
         faceNormals.push(normal)
         faceIndices.push([9, 14, 21])
@@ -429,7 +646,7 @@
         faceIndices.push([19, 20, 18])
         faceNormals.push(normal)
         // supportLess
-        normal = normals.tipToCentroid
+        normal = normalMap.tipToCentroid
         faceIndices.push([5, 12, 22])
         faceNormals.push(normal)
         faceIndices.push([7, 23, 15])
@@ -441,45 +658,108 @@
         faceIndices.push([17, 16, 22])
         faceNormals.push(normal)
         // gap less
-        normal = normals.yAxis
+        normal = normalMap.yAxis
         faceIndices.push([14, 15, 16])
         faceNormals.push(normal)
         faceIndices.push([14, 16, 18])
         faceNormals.push(normal)
         //gap more
-        normal = normals._yAxis
+        normal = normalMap._yAxis
         faceIndices.push([12, 13, 19])
         faceNormals.push(normal)
         faceIndices.push([12, 19, 17])
         faceNormals.push(normal)
         // gap bottom
-        normal = normals.zAxis
+        normal = normalMap.zAxis
         faceIndices.push([15, 14, 13])
         faceNormals.push(normal)
         faceIndices.push([15, 13, 12])
         faceNormals.push(normal)
         // gap top
-        normal = normals._zAxis
+        normal = normalMap._zAxis
         faceIndices.push([16, 17, 19])
         faceNormals.push(normal)
         faceIndices.push([16, 19, 18])
         faceNormals.push(normal)
         // edges  
         faceIndices.push([5, 11, 8]) // plus side
-        faceNormals.push(normals.plusSide)
+        faceNormals.push(normalMap.plusSide)
         faceIndices.push([10, 8, 11])
-        faceNormals.push(normals.plusSide)
+        faceNormals.push(normalMap.plusSide)
         faceIndices.push([7, 9, 10]) // minus side
-        faceNormals.push(normals.minusSide)
+        faceNormals.push(normalMap.minusSide)
         faceIndices.push([11, 7, 10])
-        faceNormals.push(normals.minusSide)
+        faceNormals.push(normalMap.minusSide)
 
-        // // Face 2 external 
-        // faceIndices.push([0, 1, 12])
-        // faceNormals.push(normals.face2out)
-        // faceIndices.push([0, 12, 1])
-        // faceNormals.push(normals.face2in)
+        // Blocks (number may vary; normals point outwards)
+        // 
+        //   30——31
+        //    \   \
+        //   *28__29
+        //    *     *     inner       outer    close    top     space
+        //     * 26——27   30——26      27——31   31––30   31——27  33——29
+        //      * \ / \    \ / \      / \ /    / \ /    / \ /   / \ /
+        // _open_*24__25    28___24  25__29   29__28   30__26  32__28
+        // _____________*.
+       
+        for (jj = 0; jj < 2; jj += 1) { // will be 4 edges
+          normals = normalArray[jj]
+          
+          for (ii = 0; ii < total; ii += 1) {
+            normal = normals.open
+            // Opening end
+            faceIndices.push([index, index+1, index+3])
+            faceNormals.push(normal)  
+            faceIndices.push([index, index+3, index+2])
+            faceNormals.push(normal)
 
+            // Inner face
+            normal = normals.inner
+            faceIndices.push([index, index+2, index+4])
+            faceNormals.push(normal)  
+            faceIndices.push([index+2, index+6, index+4])
+            faceNormals.push(normal)
+            
+            // Outer face
+            normal = normals.outer
+            faceIndices.push([index+1, index+5, index+3])
+            faceNormals.push(normal)
+            faceIndices.push([index+3, index+5, index+7])
+            faceNormals.push(normal)
+            
+            // Closing end
+            normal = normals.close
+            faceIndices.push([index+4, index+6, index+7])
+            faceNormals.push(normal)  
+            faceIndices.push([index+4, index+7, index+5])
+            faceNormals.push(normal)  
+            
+            // Top
+            normal = normalMap.zAxis
+            faceIndices.push([index+2, index+3, index+7])
+            faceNormals.push(normal)  
+            faceIndices.push([index+2, index+7, index+6])
+            faceNormals.push(normal)  
+            
+            // Space
+            faceIndices.push([index+4, index+5, index+9])
+            faceNormals.push(normal)  
+            faceIndices.push([index+4, index+9, index+8])
+            faceNormals.push(normal)
+
+            index += 8       
+          }
+
+          index += 2 // skip vertices at the end of the final space
+        }
+
+
+        if (showWitnessFace) {
+          faceIndices.push([0, 1, index])
+          faceNormals.push(normalMap.face2out)
+          faceIndices.push([0, 24, 1])
+          faceNormals.push(normalMap.face2in)
+        }
       })()
     })()
 
@@ -516,8 +796,8 @@
 
       stl += "\nendsolid " + name
 
-      fs.writeFile(path + name + v + ".stl", stl)
-      fs.writeFile(vFile, v)
+      fs.writeFile(path + name + version + ".stl", stl)
+      fs.writeFile(vFile, version)
     })()
   }
 
