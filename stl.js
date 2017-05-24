@@ -12,8 +12,8 @@
   var edge = 50 * scale
   var magWidth = 10 * scale
   var magHeight = 3 * scale
-  var ply = 1 * scale
-  var blockWidth = ply
+  var ply = 0.5 * scale
+  var blockWidth = ply *2
   var blockCount = 6 * 2 // must be an even number
 
   var vFile = "v"
@@ -93,7 +93,7 @@
         // addInteriorVertices(1, _18degrees, _72degrees)
         
         addMagnetSupport()
-
+        addMagnetBumps()
         addClipBlocks()
 
         addWitnessFace()
@@ -331,6 +331,80 @@
             vertices.push(point.clone()) // 23
 
           })()
+        }
+
+        function addMagnetBumps() {
+          //
+          //   6——————A            0——————4
+          //   \*    /|            |\   * |
+          //   |\*  / |            |•\ *  |
+          //   | \ 9  |            |  3   |
+          //   |  \|• |            | •|\  |
+          //   |   8  |            |  2 \ |
+          //   | *  \•|            | / * \|
+          //   |*    \|            |/   * \
+          //   7——————B            1——————5
+          //
+          // [0,1,2] [0,2,3] [0,3,4] [1,5,2] [2,5,3] [3,5,4]
+          // [6,7,8] [6,8,9] [6,9,A] [7,B,8] [8,B,9] [9,B,A]
+
+          var x = magWidth / 2
+          var y = magWidth / 4
+          var z = magHeight / 2
+          var r = Math.sqrt(y * y + z * z)
+          var slopeX = z / r
+          var slopeZ = y / r
+          var point = new ЗD.Vector(x, y, 0)
+
+          normalMap.bumps = [
+            [ [-1,  0, 0]
+            , [-1,  0, 0]
+            , [ 0,  1, 0]
+            , [ 0, -1, 0]
+            , [ 0,  1, 0]
+            , [ slopeX, 0, slopeZ]
+            , [ slopeX, 0, slopeZ]
+            ]
+          , [ [-slopeX, 0, slopeZ]
+            , [-slopeX, 0, slopeZ]
+            , [ 0,  1, 0]
+            , [ 0, -1, 0]
+            , [ 0,  1, 0]
+            , [ 1,  0, 0]
+            , [ 1,  0, 0]
+            ]
+          ]
+
+          // Right: magnet side
+          vertices.push(point.clone()) // 0
+          point.y = -y
+          vertices.push(point.clone()) // 1
+          // top
+          point.z = z
+          vertices.push(point.clone()) // 2
+          point.y = y
+          vertices.push(point.clone()) // 3
+          // outside
+          point.set(x+y, y, 0)
+          vertices.push(point.clone()) // 4
+          point.y = -y
+          vertices.push(point.clone()) // 5
+
+          // Left: magnet side
+          point.set(-x-y, y, 0)
+          vertices.push(point.clone()) // 6
+          point.y = -y
+          vertices.push(point.clone()) // 7
+          // top
+          point.set(-x, -y, z)
+          vertices.push(point.clone()) // 8
+          point.y = y
+          vertices.push(point.clone()) // 9
+          // outside
+          point.z = 0
+          vertices.push(point.clone()) // A
+          point.y = -y
+          vertices.push(point) // B
         }
 
         /**
@@ -580,11 +654,10 @@
 
       ;(function createFaces(){
         // Variables for blocks (whose number may be set)
-        var odd = true
-        var normalArray = normalMap.blocks
-        var index = 24
+        var index = 24 // the 36 after magnet bumps
         var total = blockCount / 2
-        var end
+        var normalArray
+          , end
           , normals
           , ii
           , jj
@@ -698,17 +771,56 @@
         faceIndices.push([11, 7, 10])
         faceNormals.push(normalMap.minusSide)
 
+        // Magnet bumps
+        //
+        //   6——————A            0——————4
+        //   \*    /|            |\   * |
+        //   |\*  / |            |•\ *  |
+        //   | \ 9  |            |  3   |
+        //   |  \|• |            | •|\  |
+        //   |   8  |            |  2 \ |
+        //   | *  \•|            | / * \|
+        //   |*    \|            |/   * \
+        //   7——————B            1——————5
+        //
+        // [0,1,2] [0,2,3] [0,3,4] [1,5,2] [2,5,3] [3,5,4]
+        // [6,7,8] [6,8,9] [6,9,A] [7,B,8] [8,B,9] [9,B,A]
+
+        normalArray = normalMap.bumps
+        index = 24
+
+        for (ii = 0; ii < 2; ii += 1) {
+          normals = normalArray[ii]
+
+          faceIndices.push([index, index+1, index+2])
+          faceNormals.push(normals.shift())
+          faceIndices.push([index, index+2, index+3])
+          faceNormals.push(normals.shift())
+          faceIndices.push([index, index+3, index+4])
+          faceNormals.push(normals.shift())
+          faceIndices.push([index+1, index+2, index+5])
+          faceNormals.push(normals.shift())
+          faceIndices.push([index+2, index+5, index+3])
+          faceNormals.push(normals.shift())
+          faceIndices.push([index+3, index+5, index+4])
+          faceNormals.push(normals.shift())
+
+          index += 6
+        }
+
         // Blocks (number may vary; normals point outwards)
-        // 
+        //      \\
         //   30——31
-        //    \   \
-        //   *28__29
-        //    *     *     inner       outer    close    top     space
+        //    \   \\
+        //   *28__29\
+        //    *     *\    inner       outer    close    top     space
         //     * 26——27   30——26      27——31   31––30   31——27  33——29
-        //      * \ / \    \ / \      / \ /    / \ /    / \ /   / \ /
-        // _open_*24__25    28___24  25__29   29__28   30__26  32__28
+        //      * \ / \\   \ / \      / \ /    / \ /    / \ /   / \ /
+        // _open_*24__25\  28___24  25__29   29__28   30__26  32__28
         // _____________*.
        
+        normalArray = normalMap.blocks
+
         for (jj = 0; jj < 4; jj += 1) { // will be 4 edges
           normals = normalArray[jj]
           
@@ -759,8 +871,7 @@
 
           index += 2 // skip vertices at the end of the final space
         }
-
-
+        
         if (showWitnessFace) {
           faceIndices.push([0, 1, index])
           faceNormals.push(normalMap.face2out)
