@@ -108,6 +108,16 @@ Vector.prototype.reverse = function reverse(vector) {
   return this
 }
 
+Vector.prototype.average = function average(vector) {
+  var average = new Vector()
+
+  average.x = (this.x + vector.x) / 2
+  average.y = (this.y + vector.y) / 2
+  average.z = (this.z + vector.z) / 2
+
+  return average
+}
+
 Vector.prototype.toString = function toString() {
   return "{ x: " + this.x + ", y: " + this.y + ", z: " + this.z + " }"
 }

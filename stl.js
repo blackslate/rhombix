@@ -17,7 +17,7 @@
   var blockWidth = ply * 3
   var blockCount = 4 * 2 // must be an even number
   var gapCount = 2 // number of blockWidths to leave empty along bevel 
-  var popDepth = ply * 3
+  var popDepth = ply * 0.5
 
   var vFile = "version"
   var path = "output/"
@@ -53,17 +53,10 @@
   // var _144degrees = _36degrees * 4
   // // 2.5132741228718345 radians 144° // dome of flat rhombohedron
 
-  var offsetX = p/2 * edge
-  var offsetY = q/2 * edge
-
   var vertices = []
   var normalMap = {}
-  var planes = {}
   var faceIndices = []
   var faceNormals = []
-  var faces = []
-  var normal
-  var face
 
   var version
 
@@ -83,6 +76,8 @@
 
     ;(function prepareAcuteRhombus(){
       ;(function createVertices(){
+        var offsetX = p/2 * edge
+        var offsetY = q/2 * edge
         var lineMap = {} // {bevel45: <Line>, ...}
 
         // Exterior vertices for rhombus
@@ -220,7 +215,9 @@
             , line
             , bevelEdge
             , point
-            , plane
+            , eastPlane
+            , westPlane
+            , northPlane
 
           ;(function createSupportOutline(){
             x = p/2 - x // from origin
@@ -251,18 +248,15 @@
 
             vertices.push(centroid) // A
 
-            // Create a plane passing through points 1, 3 and A. Call
-            // it supportMore, because it is on the side where the
-            // values of x are more than on the other face
-            planes.supportMore = new ЗD.Plane(centroid, normal)
+            // Create a plane passing through points 1, 3 and A.
+            eastPlane = new ЗD.Plane(centroid, normal)
 
             // Create a parallel plane passing through points 5 and 7
-            plane = new ЗD.Plane(vertices[5], normal)
-            planes.supportLess = plane
+            westPlane = new ЗD.Plane(vertices[5], normal)
 
             // A point on this new plane by the centroid            
             line = new ЗD.Line(centroid, normal)
-            point = plane.intersectsLine(line)
+            point = westPlane.intersectsLine(line)
             vertices.push(point.clone()) // B
 
             // Normals for sides of magnet support, starting on the
@@ -294,10 +288,10 @@
             point.subtract(offsetX)
             vertices.push(point.clone()) // C
 
-            planes.gap = new ЗD.Plane(point, new ЗD.Vector(0, -1, 0))
+            northPlane = new ЗD.Plane(point, new ЗD.Vector(0, -1, 0))
 
             line = new ЗD.Line(point, xAxis)
-            point = planes.supportMore.intersectsLine(line)
+            point = eastPlane.intersectsLine(line)
             vertices.push(point.clone()) // D
 
             point.y = -point.y
@@ -310,13 +304,13 @@
             // Top
             point.add(rayOffset)
             line.setPoint(point)                           
-            point = planes.supportLess.intersectsLine(line)
+            point = westPlane.intersectsLine(line)
             vertices.push(point.clone()) // 16
 
             point.y = -point.y
             vertices.push(point.clone()) // 17
 
-            point = planes.supportMore.intersectsLine(line)
+            point = eastPlane.intersectsLine(line)
             vertices.push(point.clone()) // 18
 
             point.y = -point.y
@@ -324,20 +318,18 @@
 
             // Apex
             line = lineMap.support1
-            plane = planes.gap
-            point = plane.intersectsLine(line)
+            point = northPlane.intersectsLine(line)
             vertices.push(point.clone()) // 20
 
             point.y = -point.y
             vertices.push(point.clone()) // 21
 
             line = lineMap.support5
-            point = plane.intersectsLine(line)
+            point = northPlane.intersectsLine(line)
             vertices.push(point.clone()) // 22
 
             point.y = -point.y
             vertices.push(point.clone()) // 23
-
           })()
         }
 
@@ -416,12 +408,11 @@
         }
 
         /**
-         * Adds six blocks along each edge, separated by the space of
-         * one block, and with a one-block gap at the end. There will
-         * be a length equivalent to 3 x the width of blocks at either
-         * end.
+         * Adds blocks along each edge, separated by the space of one
+         * block, and with a one-block gap at the end. There will be a
+         * length equivalent to 3 x the width of blocks at either end.
          * 
-         * The blocks may be slightly dovetailed so that they snap
+         * The blocks are slightly indented so that they snap
          * together with the blocks on another face.
          */
         function addClipBlocks() {
@@ -457,7 +448,8 @@
                       / blockCount
           var blockZ
 
-          // Prepare normals for blocks
+          // Prepare normals for blocks. Treat points and indentations
+          // on the ends of the blocks as having an average normal.
           normalMap.blocks = [
             { open:  _uNormal
             , inner: _vNormal
@@ -512,9 +504,11 @@
             var blockVector = blockDirection.clone()
                                             .scalarMultiply(spacing)
             var ray
+              , popOffset
               , ii
               , inner
               , upper
+              , centre
 
             // Set point to the first vertex on the outer plane
             point = bevelPoint.clone()
@@ -523,23 +517,31 @@
                                                blockWidth * gapCount))
             ray = new ЗD.Line(point.clone(), rayDirection)
 
-            //   26——27 \
-            //    \ / \  \
-            // ___24__25  \
-            // _________°*®.
+            popOffset = blockDirection.clone()
+                                      .scalarMultiply(popDepth)
+
+            //   3———————2  \
+            //    \ *.  / \  \
+            //     \  °4   \  \
+            //      \ /  °. \  \
+            // ______1_______0  \
+            // _______________°*®.
             
             for (ii = 0; ii < blockCount; ii += 1) {
+              vertices.push(point.clone()) // index + 5ii
+                                           // 
               inner = innerPlane.intersectsLine(ray)
-              vertices.push(inner) // 24 + 4ii
-
-              vertices.push(point.clone()) // 25 + 4ii
+              vertices.push(inner) // index + 1 + 5ii
 
               upper = point.clone().add(blockZ)
+              vertices.push(upper) // index + 2 + 5ii
 
               ray.setPoint(upper)
-              vertices.push(innerPlane.intersectsLine(ray)) //26 + 4ii
-
-              vertices.push(upper) // 27 + 4ii
+              vertices.push(innerPlane.intersectsLine(ray)) //...+3...
+              
+              centre = inner.average(upper)
+                            .add(popOffset)
+              vertices.push(centre) // index + 4 + 4ii
 
               point.add(blockVector)
               ray.setPoint(point)
@@ -595,8 +597,8 @@
         var index = 24 // the 36 after magnet bumps
         var total = blockCount / 2
         var normalArray
-          , end
           , normals
+          , normal
           , ii
           , jj
 
@@ -747,15 +749,21 @@
         }
 
         // Blocks (number may vary; normals point outwards)
-        //      \\
-        //   30——31
-        //    \   \\
-        //   *28__29\
-        //    *     *\    inner       outer    close    top     space
-        //     * 26——27   30——26      27——31   31––30   31——27  33——29
-        //      * \ / \\   \ / \      / \ /    / \ /    / \ /   / \ /
-        // _open_*24__25\  28___24  25__29   29__28   30__26  32__28
-        // _____________*.
+        // 
+        //   |   B_______A
+        //   |   .       .
+        //   8———————7   .
+        //   |\ *.  /|\  .
+        //   | \  °9 | \ .
+        //   |  \ /  °. \.
+        //   |   6___|___5
+        //   |   .   |   |   inner    top     outer    close     space
+        //   3———.———2   |   8———3    8——7    2———7   7———————8  B——A
+        //    \ *.  / \  |    \ / \   |\ |   / \ /   / \  . °/   |\ |
+        //     \ .°4   \ |     6———1  | \|  0———5   /   9   /    | \|
+        //      \./  °. \|            3__2         / .°  \ /     6__5
+        // ______1_______0                        5*______6
+        // _______________°*®.
        
         normalArray = normalMap.blocks
 
@@ -765,46 +773,54 @@
           for (ii = 0; ii < total; ii += 1) {
             normal = normals.open
             // Opening end
-            faceIndices.push([index, index+1, index+3])
-            faceNormals.push(normal)  
-            faceIndices.push([index, index+3, index+2])
+            faceIndices.push([index, index+4, index+1])
+            faceNormals.push(normal)
+            faceIndices.push([index+1, index+4, index+3])
+            faceNormals.push(normal)
+            faceIndices.push([index+3, index+4, index+2])
+            faceNormals.push(normal)
+            faceIndices.push([index+2, index+4, index+0])
             faceNormals.push(normal)
 
             // Inner face
             normal = normals.inner
-            faceIndices.push([index, index+2, index+4])
+            faceIndices.push([index+1, index+3, index+6])
             faceNormals.push(normal)  
-            faceIndices.push([index+2, index+6, index+4])
+            faceIndices.push([index+8, index+6, index+3])
             faceNormals.push(normal)
+            
+            // Top
+            normal = normalMap.zAxis
+            faceIndices.push([index+3, index+2, index+8])
+            faceNormals.push(normal)  
+            faceIndices.push([index+7, index+8, index+2])
+            faceNormals.push(normal)  
             
             // Outer face
             normal = normals.outer
-            faceIndices.push([index+1, index+5, index+3])
+            faceIndices.push([index, index+5, index+2])
             faceNormals.push(normal)
-            faceIndices.push([index+3, index+5, index+7])
+            faceIndices.push([index+7, index+2, index+5])
             faceNormals.push(normal)
             
             // Closing end
             normal = normals.close
-            faceIndices.push([index+4, index+6, index+7])
-            faceNormals.push(normal)  
-            faceIndices.push([index+4, index+7, index+5])
-            faceNormals.push(normal)  
-            
-            // Top
-            normal = normalMap.zAxis
-            faceIndices.push([index+2, index+3, index+7])
-            faceNormals.push(normal)  
-            faceIndices.push([index+2, index+7, index+6])
-            faceNormals.push(normal)  
-            
-            // Space
-            faceIndices.push([index+4, index+5, index+9])
-            faceNormals.push(normal)  
-            faceIndices.push([index+4, index+9, index+8])
+            faceIndices.push([index+5, index+6, index+9])
             faceNormals.push(normal)
+            faceIndices.push([index+6, index+8, index+9])
+            faceNormals.push(normal)
+            faceIndices.push([index+8, index+7, index+9])
+            faceNormals.push(normal)
+            faceIndices.push([index+7, index+5, index+9])
+            faceNormals.push(normal)
+            
+            // // Space
+            // faceIndices.push([index+6, index+5, index+11])
+            // faceNormals.push(normal)  
+            // faceIndices.push([index+10, index+11, index+5])
+            // faceNormals.push(normal)
 
-            index += 8       
+            index += 10       
           }
 
           index += 2 // skip vertices at the end of the final space
@@ -825,6 +841,8 @@
       var stl = "solid " + name + "\n"
       var total = faceIndices.length
       var ii
+        , normal
+        , face
       
       for (ii = 0; ii < total; ii += 1) {
         normal = faceNormals[ii]
