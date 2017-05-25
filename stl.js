@@ -10,13 +10,16 @@
   // <HARD-CODED>
   var scale = 4
   var edge = 50 * scale
-  var magWidth = 10 * scale
-  var magHeight = 3 * scale
-  var ply = 0.5 * scale
-  var blockWidth = ply *2
-  var blockCount = 6 * 2 // must be an even number
+  var magWidth = 12 * scale // width of gap for magnet
+  var magHeight = 4 * scale // height of gap for magnet
+  var bumpWidth = 12 * scale // length of bump to anchor magnet 
+  var ply = 1 * scale
+  var blockWidth = ply * 3
+  var blockCount = 4 * 2 // must be an even number
+  var gapCount = 2 // number of blockWidths to leave empty along bevel 
+  var popDepth = ply * 3
 
-  var vFile = "v"
+  var vFile = "version"
   var path = "output/"
   var name = "acute"
 
@@ -128,13 +131,16 @@
           if (pointIndex) {
             angles.unshift(angles.pop())
           }
-          addBevelsToLineMap()
+          addBevelsToLineMap() // lineMap.bevel_X = <Line>
           calculateInnerPoints()
 
           vertices = vertices.concat(innerPoints)
 
           // console.log(vertices)
 
+          /**
+           * Adds a bevels to line map.
+           */
           function addBevelsToLineMap() {
             var endIndex = 0
             var endVertex = vertices[endIndex]
@@ -149,7 +155,6 @@
             for (; ii-- ;) {
               startVertex = vertices[ii]
               edge = new ЗD.Line(startVertex, endVertex, "fromPoints")
-              // console.log(edge.toString())
 
               perpendicular = new ЗD.Vector(0, 0, 1)
                              .cross(edge.direction)
@@ -157,6 +162,9 @@
               tan = Math.tan(angles[ii])
               perpendicular.scalarMultiply(ply / tan)
 
+              // Find a point on line which will include the bevel
+              // segment. This point will not be one of the ends of
+              // the bevel segment.
               edge.point =  perpendicular.add(edge.point)
                                          .add(new ЗD.Vector(0, 0, ply))
               name = "bevel_" + ii
@@ -351,9 +359,9 @@
           var x = magWidth / 2
           var y = magWidth / 4
           var z = magHeight / 2
-          var r = Math.sqrt(y * y + z * z)
+          var r = Math.sqrt(bumpWidth * bumpWidth + z * z)
           var slopeX = z / r
-          var slopeZ = y / r
+          var slopeZ = bumpWidth / r
           var point = new ЗD.Vector(x, y, 0)
 
           normalMap.bumps = [
@@ -385,13 +393,13 @@
           point.y = y
           vertices.push(point.clone()) // 3
           // outside
-          point.set(x+y, y, 0)
+          point.set(x + bumpWidth, y, 0)
           vertices.push(point.clone()) // 4
           point.y = -y
           vertices.push(point.clone()) // 5
 
           // Left: magnet side
-          point.set(-x-y, y, 0)
+          point.set(-x - bumpWidth, y, 0)
           vertices.push(point.clone()) // 6
           point.y = -y
           vertices.push(point.clone()) // 7
@@ -438,28 +446,16 @@
           var offsetV = lineMap.bevel_3.direction
           var _offsetU = offsetU.clone().reverse()
           var _offsetV = offsetV.clone().reverse()
-          // Scaled vectors
-          var blockU = offsetU.clone().scalarMultiply(blockWidth)
-          var blockV = offsetV.clone().scalarMultiply(blockWidth)
-          var _blockU = blockU.clone().reverse()
-          var _blockV = blockV.clone().reverse()
           // Normals
           var uNormal = offsetU.toArray()
           var vNormal = offsetV.toArray()
           var _uNormal = _offsetU.toArray()
           var _vNormal =_offsetV.toArray()
           // Scalar
-          var spacing = (lineMap.bevel_0.point
-                                 .distanceTo(lineMap.bevel_1.point)
-                        - 6 * blockWidth) / blockCount // bigger gap
+          var spacing = (vertices[4].distanceTo(vertices[5])
+                        - gapCount * 2 * blockWidth)
+                      / blockCount
           var blockZ
-            , normal
-            , spacingOffset
-            , point, inner, upper
-            , innerPlane
-            , ray
-            , total
-            , ii  
 
           // Prepare normals for blocks
           normalMap.blocks = [
@@ -492,98 +488,40 @@
                    .normalize()
                    .scalarMultiply(blockWidth)
 
-          ;(function northEastEdge(){
-            point = vertices[4].clone()
+          // north-east: point,  ray,      block direction
+          addBlocks(vertices[4], _offsetV, offsetU)
+          // north-west
+          addBlocks(vertices[5], _offsetU, _offsetV)
+          // south-west
+          addBlocks(vertices[6], offsetV, _offsetU)
+          // south-east
+          addBlocks(vertices[7], offsetU, offsetV)
 
-            // Create inner plane for ray casting
-            normal = blockZ.cross(offsetU)
-                           .normalize()
-            point.subtract(blockV)
-            innerPlane = new ЗD.Plane(point.clone(), normal)
+          function addBlocks(bevelPoint,rayDirection,blockDirection) {
+            // point, rayDirection, blockDirection are all the
+            // original vectors. They must be cloned before they are
+            // modified.
 
-            spacingOffset = offsetU.clone()
-                                   .scalarMultiply(spacing)
-
-            // Leave a blockWidth gap before the first block
-            point.copy(lineMap.bevel_0.point)
-                 .add(blockU)
-                 .add(blockU)
-                 .add(blockU) // bigger gap
-            ray = new ЗD.Line(point.clone(), offsetV)
-
-            addBlocks(innerPlane, ray, point, spacingOffset)                        
-          })()
-
-          ;(function southEastEdge(){
-            point = vertices[7].clone() // 7 not 4
-
-            // Create inner plane for ray casting (+ U, not -V)
-            normal = blockZ.cross(offsetV) // V not U
-                            .normalize()
-            point.add(blockU)
-            innerPlane = new ЗD.Plane(point.clone(), normal)
-
-            // Set block dimensions
-            spacingOffset = offsetV.clone() // V not U
-                                   .scalarMultiply(spacing)
-
-            // Leave a blockWidth gap before the first block
-            point.copy(lineMap.bevel_3.point) // 3 not 0
-                 .add(blockV)                 // V not U
-                 .add(blockV)                 //
-                 .add(blockV)                 // bigger gap
-            ray = new ЗD.Line(point.clone(), offsetU) // U not V
-
-            addBlocks(innerPlane, ray, point, spacingOffset)                     
-          })()
-
-          ;(function northWestEdge(){
-            point = vertices[5].clone()
-
-            // Create inner plane for ray casting
-            normal = offsetV.cross(blockZ)
-                            .normalize()
-            point.add(_blockU)
-            innerPlane = new ЗD.Plane(point.clone(), normal)
-
-            spacingOffset = _offsetV.clone()
-                                   .scalarMultiply(spacing)
-
-            // Leave a blockWidth gap before the first block
-            point.copy(lineMap.bevel_1.point)
-                 .add(_blockV)
-                 .add(_blockV)
-                 .add(_blockV) // bigger gap
-            ray = new ЗD.Line(point.clone(), _offsetU)
-
-            addBlocks(innerPlane, ray, point, spacingOffset)          
-          })()
-
-          ;(function southWestEdge(){
-            point = vertices[6].clone()
-
-            // Create inner plane for ray casting
-            normal = offsetU.cross(blockZ)
-                            .normalize()
-            point.add(blockV)
-            innerPlane = new ЗD.Plane(point.clone(), normal)
-
-            spacingOffset = _offsetU.clone()
-                                   .scalarMultiply(spacing)
-
-            // Leave a blockWidth gap before the first block
-            point.copy(lineMap.bevel_2.point)
-                 .add(_blockU)
-                 .add(_blockU)
-                 .add(_blockU) // bigger gap
-            ray = new ЗD.Line(point.clone(), offsetV)
-
-            addBlocks(innerPlane, ray, point, spacingOffset)          
-          })()
-
-          function addBlocks(innerPlane, ray, point, spacingOffset) {
-            var inner
+            // Move point inwards by the blockWidth
+            var point = bevelPoint.clone()
+                                  .add(rayDirection.clone()
+                                                   .scalarMultiply(
+                                                          blockWidth))
+            var normal = blockZ.cross(blockDirection).normalize()
+            var innerPlane = new ЗD.Plane(point.clone(), normal)
+            var blockVector = blockDirection.clone()
+                                            .scalarMultiply(spacing)
+            var ray
+              , ii
+              , inner
               , upper
+
+            // Set point to the first vertex on the outer plane
+            point = bevelPoint.clone()
+                              .add(blockDirection.clone()
+                                                 .scalarMultiply(
+                                               blockWidth * gapCount))
+            ray = new ЗD.Line(point.clone(), rayDirection)
 
             //   26——27 \
             //    \ / \  \
@@ -599,11 +537,11 @@
               upper = point.clone().add(blockZ)
 
               ray.setPoint(upper)
-              vertices.push(innerPlane.intersectsLine(ray)) // 26 + 4ii
+              vertices.push(innerPlane.intersectsLine(ray)) //26 + 4ii
 
               vertices.push(upper) // 27 + 4ii
 
-              point.add(spacingOffset)
+              point.add(blockVector)
               ray.setPoint(point)
             }
 
