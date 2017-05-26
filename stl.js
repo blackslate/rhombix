@@ -6,18 +6,29 @@
   var ЗD = require("./3D.js")
 
   // return
+  // TO DO //
+  // 
+  // Trim end of magnet support
+  // Add triangular base for better adherence of magnet support
+
 
   // <HARD-CODED>
   var scale = 4
   var edge = 50 * scale
-  var magWidth = 12 * scale // width of gap for magnet
-  var magHeight = 4 * scale // height of gap for magnet
-  var bumpWidth = 12 * scale // length of bump to anchor magnet 
+  var magWidth = 12 * scale    // width of gap for magnet
+  var magHeight = 4 * scale    // height of gap for magnet
+  var bumpWidth = magWidth / 4
+  var bumpHeight = magHeight / 2
+  var bumpLength = 12 * scale  // length of bump to anchor magnet 
   var ply = 1 * scale
   var blockWidth = ply * 3
+  var blockAdjust = 0.2 // 0.0 - 0.5
   var blockCount = 4 * 2 // must be an even number
   var gapCount = 2 // number of blockWidths to leave empty along bevel 
   var popDepth = ply * 0.5
+
+  var trimWidth = blockWidth
+  var baseWidth = blockWidth
 
   var vFile = "version"
   var path = "output/"
@@ -53,8 +64,14 @@
   // var _144degrees = _36degrees * 4
   // // 2.5132741228718345 radians 144° // dome of flat rhombohedron
 
+  var normalMap = {
+    yAxis:  [0,  1,  0]
+  , _yAxis: [0, -1,  0]
+  , zAxis:  [0,  0,  1]
+  , _zAxis: [0,  0, -1]
+  }
+
   var vertices = []
-  var normalMap = {}
   var faceIndices = []
   var faceNormals = []
 
@@ -194,20 +211,21 @@
           // ABCD
           // 
           // x>               x<
-          //         A                 B
-          //        / \               / \
-          //      21–––20           23–––22
-          //      /|  /|\           /|  /|\
-          //     / | / | \         / | / | \
-          //    /  |/  |  \       /  |/  |  \
-          //   /  18———19  \     /  16———17  \
-          //  9————E   D————8   7————F   C————5
+          //          A                  B
+          //         / \                / \
+          //       21–––20            23–––22
+          //       /|  /|\            /|  /|\
+          //      / | / | \          / | / | \
+          //     /  |/  |  \        /  |/  |  \
+          //    /  18———19  \       18—16——17—D
+          //   /                    |\ |   | \|
+          //  9————16   F—————8   7 D—17   E——C 5
           // 3_______________1
           //                  
           // Find the centroid of the equilateral triangle which joins
           // the short diagonals of three faces at one peak, and the
           // normal for this triangle. Normal is unscaled.
-
+return
           var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
           var z = Math.sqrt(1 - x * x)
           var normal
@@ -267,7 +285,7 @@
             normalMap.minusSide = [normal.x, -normal.y, normal.z]
           })()
 
-          ;(function createGap(){
+          ;(function createGap() {
             var xAxis = new ЗD.Vector(1, 0, 0)
             var yAxis = new ЗD.Vector(0, 1, 0)
             var rayOffset = new ЗD.Vector(0, 0, magHeight)
@@ -275,21 +293,29 @@
               , offsetX
               , line
 
-            normalMap.yAxis = [yAxis.x, yAxis.y, yAxis.z]
-            normalMap._yAxis = [0, -1, 0]
-            normalMap.zAxis = [0, 0, 1]
-            normalMap._zAxis = [0, 0, -1]
-
-            // Bottom, less face
+            // Calculate width of feet either side of the magnet gap
             point.copy(vertices[5])
-            width = (point.distanceTo(vertices[7]) - magWidth) / 2
+
+            width = (point.distanceTo(vertices[7]))
+            width = (width - magWidth - trimWidth) / 2
             offsetX = new ЗD.Vector(0, width, 0)
 
-            point.subtract(offsetX)
+            point.subtract(yAxis.clone().scalarMultiply(trimWidth))
             vertices.push(point.clone()) // C
-
+            
+            // Create plane to make horizontal slices
             northPlane = new ЗD.Plane(point, new ЗD.Vector(0, -1, 0))
+            line = new ЗD.Line(point, yAxis)
 
+            // Point at shoulder of trim
+            vertices.push(northPlane.intersectsLine(line)) // D
+
+            // Move to north of magnet gap. northPlane and line
+            // follow as point changes
+            point.subtract(offsetX)
+            vertices.push(point.clone()) // E
+
+            // Find equivalent point in west plane
             line = new ЗD.Line(point, xAxis)
             point = eastPlane.intersectsLine(line)
             vertices.push(point.clone()) // D
@@ -349,11 +375,11 @@
           // [6,7,8] [6,8,9] [6,9,A] [7,B,8] [8,B,9] [9,B,A]
 
           var x = magWidth / 2
-          var y = magWidth / 4
-          var z = magHeight / 2
-          var r = Math.sqrt(bumpWidth * bumpWidth + z * z)
+          var y = bumpWidth
+          var z = bumpHeight
+          var r = Math.sqrt(bumpLength * bumpLength + z * z)
           var slopeX = z / r
-          var slopeZ = bumpWidth / r
+          var slopeZ = bumpLength / r
           var point = new ЗD.Vector(x, y, 0)
 
           normalMap.bumps = [
@@ -385,13 +411,13 @@
           point.y = y
           vertices.push(point.clone()) // 3
           // outside
-          point.set(x + bumpWidth, y, 0)
+          point.set(x + bumpLength, y, 0)
           vertices.push(point.clone()) // 4
           point.y = -y
           vertices.push(point.clone()) // 5
 
           // Left: magnet side
-          point.set(-x - bumpWidth, y, 0)
+          point.set(-x - bumpLength, y, 0)
           vertices.push(point.clone()) // 6
           point.y = -y
           vertices.push(point.clone()) // 7
@@ -481,28 +507,29 @@
                    .scalarMultiply(blockWidth)
 
           // north-east: point,  ray,      block direction
-          addBlocks(vertices[4], _offsetV, offsetU)
+          addBlocks(vertices[4], _offsetV, offsetU, true)
           // north-west
-          addBlocks(vertices[5], _offsetU, _offsetV)
+          addBlocks(vertices[5], _offsetU, _offsetV, true)
           // south-west
-          addBlocks(vertices[6], offsetV, _offsetU)
+          addBlocks(vertices[6], offsetV, _offsetU, true)
           // south-east
-          addBlocks(vertices[7], offsetU, offsetV)
+          addBlocks(vertices[7], offsetU, offsetV, false)
 
-          function addBlocks(bevelPoint,rayDirection,blockDirection) {
-            // point, rayDirection, blockDirection are all the
-            // original vectors. They must be cloned before they are
+          function addBlocks(bevelPoint, ray, blockDirection, pop) {
+            // point, ray, blockDirection are all the original
+            // vectors. They must be cloned before they are
             // modified.
 
             // Move point inwards by the blockWidth
             var point = bevelPoint.clone()
-                                  .add(rayDirection.clone()
-                                                   .scalarMultiply(
-                                                          blockWidth))
+                                  .add(ray.clone()
+                                          .scalarMultiply(blockWidth))
             var normal = blockZ.cross(blockDirection).normalize()
             var innerPlane = new ЗD.Plane(point.clone(), normal)
             var blockVector = blockDirection.clone()
                                             .scalarMultiply(spacing)
+            var adjust = blockDirection.clone()
+                                  .scalarMultiply(spacing*blockAdjust)
             var ray
               , popOffset
               , ii
@@ -515,10 +542,13 @@
                               .add(blockDirection.clone()
                                                  .scalarMultiply(
                                                blockWidth * gapCount))
-            ray = new ЗD.Line(point.clone(), rayDirection)
+            ray = new ЗD.Line(point.clone(), ray) // direction => line
 
             popOffset = blockDirection.clone()
                                       .scalarMultiply(popDepth)
+            if (!pop) {
+              popOffset.reverse()
+            }
 
             //   3———————2  \
             //    \ *.  / \  \
@@ -544,6 +574,14 @@
               vertices.push(centre) // index + 4 + 4ii
 
               point.add(blockVector)
+              if (!ii) {
+                point.subtract(adjust)
+              } else if (ii % 2) {
+                point.add(adjust).add(adjust)
+              } else {
+                point.subtract(adjust).subtract(adjust)
+              }
+
               ray.setPoint(point)
             }
 
@@ -594,9 +632,9 @@
 
       ;(function createFaces(){
         // Variables for blocks (whose number may be set)
-        var index = 24 // the 36 after magnet bumps
-        var total = blockCount / 2
-        var normalArray
+        var total
+          , index
+          , normalArray
           , normals
           , normal
           , ii
@@ -636,80 +674,80 @@
 
         // Faces for top
         normal = [0, 0, 1]
-        faceIndices.push([9, 4, 8])
+        faceIndices.push([4, 5, 7])
         faceNormals.push(normal)
         faceIndices.push([7, 5, 6])
         faceNormals.push(normal)
 
-        // Magnet support   
-        // x>               x<
-        //         A                 B
-        //        / \               / \
-        //      21–––20           23–––22
-        //      /|  /|\           /|  /|\
-        //     / | / | \         / | / | \
-        //    /  |/  |  \       /  |/  |  \
-        //   /  18———19  \     /  16———17  \
-        //  9————E   D————8   7————F   C————5
-        // 3_______________1
+        // // Magnet support   
+        // // x>               x<
+        // //         A                 B
+        // //        / \               / \
+        // //      21–––20           23–––22
+        // //      /|  /|\           /|  /|\
+        // //     / | / | \         / | / | \
+        // //    /  |/  |  \       /  |/  |  \
+        // //   /  18———19  \     /  16———17  \
+        // //  9————E   D————8   7————F   C————5
+        // // 3_______________1
 
-        // supportMore (tip side)
-        normal = normalMap.centroidToTip
-        faceIndices.push([8, 20, 13])
-        faceNormals.push(normal)
-        faceIndices.push([9, 14, 21])
-        faceNormals.push(normal)
-        faceIndices.push([10, 21, 20])
-        faceNormals.push(normal)
-        faceIndices.push([18, 20, 21])
-        faceNormals.push(normal)
-        faceIndices.push([19, 20, 18])
-        faceNormals.push(normal)
-        // supportLess
-        normal = normalMap.tipToCentroid
-        faceIndices.push([5, 12, 22])
-        faceNormals.push(normal)
-        faceIndices.push([7, 23, 15])
-        faceNormals.push(normal)
-        faceIndices.push([11, 22, 23])
-        faceNormals.push(normal)
-        faceIndices.push([16, 23, 22])
-        faceNormals.push(normal)
-        faceIndices.push([17, 16, 22])
-        faceNormals.push(normal)
-        // gap less
-        normal = normalMap.yAxis
-        faceIndices.push([14, 15, 16])
-        faceNormals.push(normal)
-        faceIndices.push([14, 16, 18])
-        faceNormals.push(normal)
-        //gap more
-        normal = normalMap._yAxis
-        faceIndices.push([12, 13, 19])
-        faceNormals.push(normal)
-        faceIndices.push([12, 19, 17])
-        faceNormals.push(normal)
-        // gap bottom
-        normal = normalMap.zAxis
-        faceIndices.push([15, 14, 13])
-        faceNormals.push(normal)
-        faceIndices.push([15, 13, 12])
-        faceNormals.push(normal)
-        // gap top
-        normal = normalMap._zAxis
-        faceIndices.push([16, 17, 19])
-        faceNormals.push(normal)
-        faceIndices.push([16, 19, 18])
-        faceNormals.push(normal)
-        // edges  
-        faceIndices.push([5, 11, 8]) // plus side
-        faceNormals.push(normalMap.plusSide)
-        faceIndices.push([10, 8, 11])
-        faceNormals.push(normalMap.plusSide)
-        faceIndices.push([7, 9, 10]) // minus side
-        faceNormals.push(normalMap.minusSide)
-        faceIndices.push([11, 7, 10])
-        faceNormals.push(normalMap.minusSide)
+        // // supportMore (tip side)
+        // normal = normalMap.centroidToTip
+        // faceIndices.push([8, 20, 13])
+        // faceNormals.push(normal)
+        // faceIndices.push([9, 14, 21])
+        // faceNormals.push(normal)
+        // faceIndices.push([10, 21, 20])
+        // faceNormals.push(normal)
+        // faceIndices.push([18, 20, 21])
+        // faceNormals.push(normal)
+        // faceIndices.push([19, 20, 18])
+        // faceNormals.push(normal)
+        // // supportLess
+        // normal = normalMap.tipToCentroid
+        // faceIndices.push([5, 12, 22])
+        // faceNormals.push(normal)
+        // faceIndices.push([7, 23, 15])
+        // faceNormals.push(normal)
+        // faceIndices.push([11, 22, 23])
+        // faceNormals.push(normal)
+        // faceIndices.push([16, 23, 22])
+        // faceNormals.push(normal)
+        // faceIndices.push([17, 16, 22])
+        // faceNormals.push(normal)
+        // // gap less
+        // normal = normalMap.yAxis
+        // faceIndices.push([14, 15, 16])
+        // faceNormals.push(normal)
+        // faceIndices.push([14, 16, 18])
+        // faceNormals.push(normal)
+        // //gap more
+        // normal = normalMap._yAxis
+        // faceIndices.push([12, 13, 19])
+        // faceNormals.push(normal)
+        // faceIndices.push([12, 19, 17])
+        // faceNormals.push(normal)
+        // // gap bottom
+        // normal = normalMap.zAxis
+        // faceIndices.push([15, 14, 13])
+        // faceNormals.push(normal)
+        // faceIndices.push([15, 13, 12])
+        // faceNormals.push(normal)
+        // // gap top
+        // normal = normalMap._zAxis
+        // faceIndices.push([16, 17, 19])
+        // faceNormals.push(normal)
+        // faceIndices.push([16, 19, 18])
+        // faceNormals.push(normal)
+        // // edges  
+        // faceIndices.push([5, 11, 8]) // plus side
+        // faceNormals.push(normalMap.plusSide)
+        // faceIndices.push([10, 8, 11])
+        // faceNormals.push(normalMap.plusSide)
+        // faceIndices.push([7, 9, 10]) // minus side
+        // faceNormals.push(normalMap.minusSide)
+        // faceIndices.push([11, 7, 10])
+        // faceNormals.push(normalMap.minusSide)
 
         // Magnet bumps
         //
@@ -727,7 +765,7 @@
         // [6,7,8] [6,8,9] [6,9,A] [7,B,8] [8,B,9] [9,B,A]
 
         normalArray = normalMap.bumps
-        index = 24
+        index = 8
 
         for (ii = 0; ii < 2; ii += 1) {
           normals = normalArray[ii]
@@ -765,6 +803,7 @@
         // ______1_______0                        5*______6
         // _______________°*®.
        
+        total = blockCount / 2
         normalArray = normalMap.blocks
 
         for (jj = 0; jj < 4; jj += 1) { // will be 4 edges
