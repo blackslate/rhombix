@@ -15,7 +15,7 @@
   var bumpLength = 12 * scale  // length of bump to anchor magnet 
   var ply = 1 * scale
   var blockWidth = ply * 3
-  var blockAdjust = 0.2 // 0.0 - 0.5
+  var blockAdjust = 0.0 // 0.0 - 0.5
   var blockCount = 4 * 2 // must be an even number
   var gapCount = 2 // number of blockWidths to leave empty along bevel 
   var popDepth = ply * 0.5
@@ -528,9 +528,9 @@
           // north-east: point,  ray,      block direction
           addBlocks(vertices[4], _offsetV, offsetU, true)
           // north-west
-          addBlocks(vertices[5], _offsetU, _offsetV, true)
+          addBlocks(vertices[5], _offsetU, _offsetV, 2)
           // south-west
-          addBlocks(vertices[6], offsetV, _offsetU, true)
+          addBlocks(vertices[6], offsetV, _offsetU, 2)
           // south-east
           addBlocks(vertices[7], offsetU, offsetV, false)
 
@@ -538,6 +538,11 @@
             // point, ray, blockDirection are all the original
             // vectors. They must be cloned before they are
             // modified.
+            // pop may be true, false or 2. True and false determine
+            // the direction of all the pop blocks on the edges at
+            // the peak of the rhombohedron. 2 creates a two-way set
+            // of blocks for the outer edges, where the rhombus is 
+            // rotated around the z-axis.
 
             // Move point inwards by the blockWidth
             var point = bevelPoint.clone()
@@ -551,6 +556,10 @@
                                   .scalarMultiply(spacing*blockAdjust)
             var ray
               , popOffset
+              // for pop === 2
+              , halfway
+              , out
+              // 
               , ii
               , inner
               , upper
@@ -567,6 +576,9 @@
                                       .scalarMultiply(popDepth)
             if (!pop) {
               popOffset.reverse()
+            } else if (pop === 2) {
+              halfway = blockCount / 2
+              out = true
             }
 
             //   3———————2  \
@@ -587,11 +599,29 @@
 
               ray.setPoint(upper)
               vertices.push(innerPlane.intersectsLine(ray)) //...+3...
-              
+
               centre = inner.average(upper)
-                            .add(popOffset)
+              if (halfway) {
+                // Alternate ins and outs with a flat side at each end
+                // and in the centre
+                switch (ii) {
+                  case 0:
+                  case halfway:
+                    break;
+                  default:
+                    out ? centre.add(popOffset)
+                        : centre.subtract(popOffset)
+                    out = !out
+                }
+
+              } else {
+                centre.add(popOffset)
+              }
+
               vertices.push(centre) // index + 4 + 4ii
 
+              // Adjust spacing between blocks to account for overrun
+              // when printing
               point.add(blockVector)
               if (!ii) {
                 point.subtract(adjust)
