@@ -5,13 +5,6 @@
   var fs = require("fs")
   var ЗD = require("./3D.js")
 
-  // return
-  // TO DO //
-  // 
-  // Trim end of magnet support
-  // Add triangular base for better adherence of magnet support
-
-
   // <HARD-CODED>
   var scale = 4
   var edge = 50 * scale
@@ -27,8 +20,8 @@
   var gapCount = 2 // number of blockWidths to leave empty along bevel 
   var popDepth = ply * 0.5
 
-  var trimWidth = blockWidth
-  var baseWidth = blockWidth
+  var trimWidth = blockWidth * 2
+  var buttressWidth = blockWidth
 
   var vFile = "version"
   var path = "output/"
@@ -103,12 +96,22 @@
         vertices.push(new ЗD.Vector(-offsetX, 0, 0))
         vertices.push(new ЗD.Vector(0, -offsetY, 0))
 
+        // vertice.length = 4
+
         // Interior
         addInteriorVertices(0, _36degrees, _54degrees)
         // addInteriorVertices(1, _18degrees, _72degrees)
-        
+
+        // vertices.length = 8
+ 
         addMagnetSupport()
+
+        // vertices.length = 34
+ 
         addMagnetBumps()
+
+        // vertices.length = 56
+ 
         addClipBlocks()
 
         addWitnessFace()
@@ -204,69 +207,84 @@
           }
         }
 
-        function addMagnetSupport() {
-          // The support for the magnet on the acute rhombohedron is
-          // created with 5 triangles on the front face, 5 on the
-          // back face, 2 x 2 edges, and a total of 6 in the gap
-          // ABCD
+        function addMagnetSupport() { 
+          // Create a set of vertice for the magnet support and its
+          // buttresses.
           // 
-          // x>               x<
-          //          A                  B
-          //         / \                / \
-          //       21–––20            23–––22
-          //       /|  /|\            /|  /|\
-          //      / | / | \          / | / | \
-          //     /  |/  |  \        /  |/  |  \
-          //    /  18———19  \       18—16——17—D
-          //   /                    |\ |   | \|
-          //  9————16   F—————8   7 D—17   E——C 5
-          // 3_______________1
-          //                  
-          // Find the centroid of the equilateral triangle which joins
-          // the short diagonals of three faces at one peak, and the
-          // normal for this triangle. Normal is unscaled.
-return
-          var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
-          var z = Math.sqrt(1 - x * x)
-          var normal
+          //          9                     8
+          //         / \                   / \
+          //       26–––E                31–––19               
+          //       /|  /|\               /|  /|\
+          //      / | / | \             / | / | \
+          //     /  |/  |  \           /  |/  |  \
+          //    23——25——D———B         28——30—18——16
+          //    | \ |   | \ |         |   |   |   |
+          //  7 22——24  C———A 5       27——29 17———F *  
+          //                       3_________________1
+          //
+          //
+          //     28——————30       18——————16
+          //      |\    / .\       |\    / .\
+          //     27.\../.29 \     17.\../..F \
+          //       °32_____°33      °21_____°20
+
+          var eastPlane
+            , westPlane
+            , northPlane 
+            , point            
+ 
+          ;(function createSupportOutline() {
+            // Find the centroid of the equilateral triangle which
+            // joins the short diagonals of three faces at one peak,
+            // and the normal for this triangle. Normal is unscaled.
+            // Create a "west" plane parallel to the plane of this
+            // equilateral, to give the support thickness.
+            //
+            // west<                >east
+            //          9                     8
+            //         / \                   / \
+            //        /   \                 /   \              
+            //       /     \               /     \
+            //      /       \             /       \
+            //     /         \           /         \
+            //    •           •         •           •
+            //   •             •       •             •
+            //  7               5     •               *  
+            //                       3_________________1
+  
+            // <Repeated in addClipBlocks()>
+            var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
+            var z = Math.sqrt(1 - x * x)
+            // </Repeated>
+
+            var normal
             , centroid
             , line
             , bevelEdge
-            , point
-            , eastPlane
-            , westPlane
-            , northPlane
 
-          ;(function createSupportOutline(){
             x = p/2 - x // from origin
 
             normal = new ЗD.Vector(x/3, 0, z/3)
                            .subtract(new ЗD.Vector(p/2, 0, 0))
                            .normalize()
-            normalMap.tipToCentroid = [normal.x, normal.y, normal.z]
+            normalMap.tipToCentroid = normal.toArray()
             normalMap.centroidToTip = [-normal.x,-normal.y,-normal.z]
             
             // Scale for centroid
             centroid = new ЗD.Vector (x * edge / 3, 0, z * edge / 3)
 
             // Find where lines from ends of short diagonal cross the
-            // inner bevels
-            // y>0
-            line = new ЗD.Line(centroid, vertices[1], "fromPoints")
-            lineMap.support1 = line
+            // inner bevels at the north end
+            line = new ЗD.Line(vertices[1], centroid, "fromPoints")
+            lineMap.support_1 = line
             bevelEdge = lineMap.bevel_0
-            point = bevelEdge.closestPointTo(line)
-            vertices.push(point.clone()) // 8
 
-            lineMap.support5 = line.clone().setPoint(vertices[5])
+            // Create line from bevelled corner
+            lineMap.support_5 = line.clone().setPoint(vertices[5])
 
-            // y<0
-            point.y = -point.y
-            vertices.push(point.clone()) // 9
+            vertices.push(centroid) // 8
 
-            vertices.push(centroid) // A
-
-            // Create a plane passing through points 1, 3 and A.
+            // Create a plane passing through points (1, 3 and) 8.
             eastPlane = new ЗD.Plane(centroid, normal)
 
             // Create a parallel plane passing through points 5 and 7
@@ -275,87 +293,87 @@ return
             // A point on this new plane by the centroid            
             line = new ЗD.Line(centroid, normal)
             point = westPlane.intersectsLine(line)
-            vertices.push(point.clone()) // B
+            vertices.push(point.clone()) // 9
 
             // Normals for sides of magnet support, starting on the
             // y>0 side
             normal = bevelEdge.direction
-                              .cross(lineMap.support1.direction)
-            normalMap.plusSide = [normal.x, normal.y, normal.z]
-            normalMap.minusSide = [normal.x, -normal.y, normal.z]
+                              .cross(lineMap.support_1.direction)
+            normalMap.northSide = [normal.x, normal.y, normal.z]
+            normalMap.southSide = [normal.x, -normal.y, normal.z]
           })()
 
           ;(function createGap() {
             var xAxis = new ЗD.Vector(1, 0, 0)
             var yAxis = new ЗD.Vector(0, 1, 0)
             var rayOffset = new ЗD.Vector(0, 0, magHeight)
+            var start = vertices.length
+            var buttressOffset = xAxis.clone()
+                                      .scalarMultiply(buttressWidth)
             var width
               , offsetX
               , line
+              , end
+              , ii
 
             // Calculate width of feet either side of the magnet gap
             point.copy(vertices[5])
 
             width = (point.distanceTo(vertices[7]))
-            width = (width - magWidth - trimWidth) / 2
+            width = (width - magWidth) / 2 - trimWidth
             offsetX = new ЗD.Vector(0, width, 0)
 
+            // Point at foot of trimmed support
             point.subtract(yAxis.clone().scalarMultiply(trimWidth))
-            vertices.push(point.clone()) // C
+            vertices.push(point.clone()) // A
             
             // Create plane to make horizontal slices
             northPlane = new ЗD.Plane(point, new ЗD.Vector(0, -1, 0))
-            line = new ЗD.Line(point, yAxis)
+            line = lineMap.support_5 // \
 
             // Point at shoulder of trim
-            vertices.push(northPlane.intersectsLine(line)) // D
+            vertices.push(northPlane.intersectsLine(line)) // B
 
-            // Move to north of magnet gap. northPlane and line
-            // follow as point changes
+            // Move to north of magnet gap. northPlane follows as
+            // point changes
             point.subtract(offsetX)
-            vertices.push(point.clone()) // E
+            vertices.push(point.clone()) // C
 
-            // Find equivalent point in west plane
+            // Top of magnet gap
+            point.add(rayOffset)
             line = new ЗD.Line(point, xAxis)
-            point = eastPlane.intersectsLine(line)
+            point = westPlane.intersectsLine(line)
             vertices.push(point.clone()) // D
 
-            point.y = -point.y
+            // Base of apex triangle
+            point = northPlane.intersectsLine(lineMap.support_5)
             vertices.push(point.clone()) // E
 
-            point.copy(vertices[12]) // (C)
-            point.y = -point.y
-            vertices.push(point.clone()) // F
+            // Project points C - 16 onto east face: F - 19
+            end = vertices.length           
+            for (ii = start; ii < end; ii += 1) {
+              point = vertices[ii]
+              line.setPoint(point)
+              vertices.push(eastPlane.intersectsLine(line))
+            }
 
-            // Top
-            point.add(rayOffset)
-            line.setPoint(point)                           
-            point = westPlane.intersectsLine(line)
-            vertices.push(point.clone()) // 16
+            // Create buttress points on base
+            point = vertices[start].clone().add(buttressOffset)  // 20
+            vertices.push(point)
+            point = vertices[start+2].clone().add(buttressOffset) //21
+            vertices.push(point)
 
-            point.y = -point.y
-            vertices.push(point.clone()) // 17
+            // Normal for angled buttress faces
+            normalMap.butt = new ЗD.Vector(buttressWidth,0,magHeight)
+                                   .normalize()
 
-            point = eastPlane.intersectsLine(line)
-            vertices.push(point.clone()) // 18
-
-            point.y = -point.y
-            vertices.push(point.clone()) // 19
-
-            // Apex
-            line = lineMap.support1
-            point = northPlane.intersectsLine(line)
-            vertices.push(point.clone()) // 20
-
-            point.y = -point.y
-            vertices.push(point.clone()) // 21
-
-            line = lineMap.support5
-            point = northPlane.intersectsLine(line)
-            vertices.push(point.clone()) // 22
-
-            point.y = -point.y
-            vertices.push(point.clone()) // 23
+            // Copy points C - 21 to the south side: 22 - 33
+            end = vertices.length          
+            for (ii = start; ii < end; ii += 1) {
+              point = vertices[ii].clone()
+              point.y = -point.y
+              vertices.push(point)
+            }
           })()
         }
 
@@ -458,6 +476,7 @@ return
 
           var x = Math.cos(acute) / Math.cos(acute / 2) // from tip
           var z = Math.sqrt(1 - x * x)
+
           // Unit vectors
           var offsetU = lineMap.bevel_0.direction
           var offsetV = lineMap.bevel_3.direction
@@ -679,75 +698,198 @@ return
         faceIndices.push([7, 5, 6])
         faceNormals.push(normal)
 
-        // // Magnet support   
-        // // x>               x<
-        // //         A                 B
-        // //        / \               / \
-        // //      21–––20           23–––22
-        // //      /|  /|\           /|  /|\
-        // //     / | / | \         / | / | \
-        // //    /  |/  |  \       /  |/  |  \
-        // //   /  18———19  \     /  16———17  \
-        // //  9————E   D————8   7————F   C————5
-        // // 3_______________1
+        // Magnet support
+        // The support for the magnet on the acute rhombohedron is
+        // created with 9 triangles on the west face, 5 on the east
+        // face plus 4 buttress faces, 4 x 2 edges, and a total of 8
+        // in the gap.
+        // 
+        // west<                 east>
+        //          9                     8
+        //         / \                   / \
+        //       26–––E                31–––19
+        //       /|  /|\               /|  /|\
+        //      / | / | \             / | / | \
+        //     /  |/  |  \           /  |/  |  \
+        //    23——25——D———B         28——30—18——16
+        //    | \ |   | \ |         |   |   |   |
+        //  7 22——24  C———A 5       27——29 17———F *  
+        //                       3_________________1
+        //
+        // gap
+        //                 30——————18
+        //                /  ° • . /
+        //           30——25———————D——18
+        //          • |\ |        |\ | •
+        //        .°  | \|        | \|  °.
+        //       33——29——24———————C——17——21
+        //                \      / \ 
+        //                 \    /   \ 
+        //                  \  /     \ 
+        //                   \/       \ 
+         //                  33———————21
+        //
+        // buttress
+        // 
+        //     28—————30       18—————16
+        //      |\   / .\       |\   / .\
+        //     27.\./.29 \     17.\./..F \
+        //       °32____°33      °21____°20
+        //
+        // south             north
+        //       9———8             8———9
+        //       |  /|             |  /|
+        //       | / |             | / |  normal: angled
+        //       |/  |             |/  |
+        //       23—28.           .16——B
+        //       | / | °•.     .•° | / |          +±yAxis
+        //       22—27———32   20———F———A
+  
+        // east face (tip side)
+        //                                8
+        //                               / \
+        //                             31–––19
+        //                             /|  /|\
+        //                            / | / | \
+        //                           /  |/  |  \
+        //                          28——30—18——16
 
-        // // supportMore (tip side)
-        // normal = normalMap.centroidToTip
-        // faceIndices.push([8, 20, 13])
-        // faceNormals.push(normal)
-        // faceIndices.push([9, 14, 21])
-        // faceNormals.push(normal)
-        // faceIndices.push([10, 21, 20])
-        // faceNormals.push(normal)
-        // faceIndices.push([18, 20, 21])
-        // faceNormals.push(normal)
-        // faceIndices.push([19, 20, 18])
-        // faceNormals.push(normal)
-        // // supportLess
-        // normal = normalMap.tipToCentroid
-        // faceIndices.push([5, 12, 22])
-        // faceNormals.push(normal)
-        // faceIndices.push([7, 23, 15])
-        // faceNormals.push(normal)
-        // faceIndices.push([11, 22, 23])
-        // faceNormals.push(normal)
-        // faceIndices.push([16, 23, 22])
-        // faceNormals.push(normal)
-        // faceIndices.push([17, 16, 22])
-        // faceNormals.push(normal)
-        // // gap less
-        // normal = normalMap.yAxis
-        // faceIndices.push([14, 15, 16])
-        // faceNormals.push(normal)
-        // faceIndices.push([14, 16, 18])
-        // faceNormals.push(normal)
-        // //gap more
-        // normal = normalMap._yAxis
-        // faceIndices.push([12, 13, 19])
-        // faceNormals.push(normal)
-        // faceIndices.push([12, 19, 17])
-        // faceNormals.push(normal)
-        // // gap bottom
-        // normal = normalMap.zAxis
-        // faceIndices.push([15, 14, 13])
-        // faceNormals.push(normal)
-        // faceIndices.push([15, 13, 12])
-        // faceNormals.push(normal)
-        // // gap top
-        // normal = normalMap._zAxis
-        // faceIndices.push([16, 17, 19])
-        // faceNormals.push(normal)
-        // faceIndices.push([16, 19, 18])
-        // faceNormals.push(normal)
-        // // edges  
-        // faceIndices.push([5, 11, 8]) // plus side
-        // faceNormals.push(normalMap.plusSide)
-        // faceIndices.push([10, 8, 11])
-        // faceNormals.push(normalMap.plusSide)
-        // faceIndices.push([7, 9, 10]) // minus side
-        // faceNormals.push(normalMap.minusSide)
-        // faceIndices.push([11, 7, 10])
-        // faceNormals.push(normalMap.minusSide)
+        normal = normalMap.centroidToTip
+        faceIndices.push([8, 31, 19])
+        faceNormals.push(normal)
+        faceIndices.push([16, 19, 18])
+        faceNormals.push(normal)
+        faceIndices.push([18, 19, 30])
+        faceNormals.push(normal)
+        faceIndices.push([19, 31, 30])
+        faceNormals.push(normal)
+        faceIndices.push([28, 30, 31])
+        faceNormals.push(normal)
+
+        // angled buttress faces
+        //     28—————30       18————16
+        //       \   / \        \   / \
+        //        \ /   \        \ /   \
+        //        32—————33       21————20
+
+        normal = normalMap.butt
+        faceIndices.push([16, 21, 20])
+        faceNormals.push(normal)
+        faceIndices.push([18, 21, 16])
+        faceNormals.push(normal)
+        faceIndices.push([28, 32, 30])
+        faceNormals.push(normal)
+        faceIndices.push([30, 32, 33])
+        faceNormals.push(normal)
+        
+        // west face (normals pointing into screen)
+        //          9
+        //         / \
+        //       26–––E             
+        //       /|  /|\
+        //      / | / | \
+        //     /  |/  |  \
+        //    23——25——D———B
+        //    | \ |   | \ |
+        //    22——24  C———A
+      
+        normal = normalMap.tipToCentroid
+        faceIndices.push([9, 14, 26])
+        faceNormals.push(normal)
+        faceIndices.push([10, 13, 11])
+        faceNormals.push(normal)
+        faceIndices.push([11, 13, 14])
+        faceNormals.push(normal)
+        faceIndices.push([12, 13, 10])
+        faceNormals.push(normal)
+        faceIndices.push([13, 25, 14])
+        faceNormals.push(normal)
+        faceIndices.push([14, 25, 26])
+        faceNormals.push(normal)
+        faceIndices.push([22, 23, 24])
+        faceNormals.push(normal)
+        faceIndices.push([23, 25, 24])
+        faceNormals.push(normal)
+        faceIndices.push([25, 23, 26])
+        faceNormals.push(normal)
+
+        // gap
+        //                 30——————18
+        //                /  ° • . /
+        //           30——25———————D——18
+        //          • |\ |        |\ | •
+        //        .°  | \|        | \|  °.
+        //       33——29——24———————C——17——21
+        //                \      / \ 
+        //                 \    /   \ 
+        //                  \  /     \ 
+        //                   \/       \ 
+        //                   33———————21
+        
+        // north side
+        normal = normalMap._yAxis
+        faceIndices.push([12, 17, 13])
+        faceNormals.push(normal)
+        faceIndices.push([13, 17, 18])
+        faceNormals.push(normal)
+        faceIndices.push([17, 21, 18])
+        faceNormals.push(normal)
+        // south side
+        normal = normalMap.yAxis
+        faceIndices.push([24, 25, 30])
+        faceNormals.push(normal)
+        faceIndices.push([24, 30, 29])
+        faceNormals.push(normal)
+        faceIndices.push([29, 30, 33])
+        faceNormals.push(normal)
+        // bottom
+        normal = normalMap.zAxis
+        faceIndices.push([12, 24, 33])
+        faceNormals.push(normal)
+        faceIndices.push([12, 32, 21])
+        faceNormals.push(normal)
+        // gap top
+        normal = normalMap._zAxis
+        faceIndices.push([13, 18, 30])
+        faceNormals.push(normal)
+        faceIndices.push([13, 30, 25])
+        faceNormals.push(normal)
+
+        // edges  
+        // south             north
+        //       9———8             8———9
+        //       |  /|             |  /|
+        //       | / |             | / |  normal: xxxthSide
+        //       |/  |             |/  |
+        //       23—28.           .16——B
+        //       | / | °•.     .•° | / |          +±yAxis
+        //       22—27———32   20———F———A
+
+        normal = normalMap.southSide
+        faceIndices.push([8, 9, 23])
+        faceNormals.push(normal)
+        faceIndices.push([8, 23, 28])
+        faceNormals.push(normal)
+        normal = normalMap.yAxis
+        faceIndices.push([22, 28, 23])
+        faceNormals.push(normal)
+        faceIndices.push([22, 27, 28])
+        faceNormals.push(normal)
+        faceIndices.push([27, 32, 28])
+        faceNormals.push(normal)
+
+        normal = normalMap.northSide
+        faceIndices.push([8, 9, 16])
+        faceNormals.push(normal)
+        faceIndices.push([9, 16, 11])
+        faceNormals.push(normal)
+        normal = normalMap._yAxis
+        faceIndices.push([10, 11, 15])
+        faceNormals.push(normal)
+        faceIndices.push([11, 16, 15])
+        faceNormals.push(normal)
+        faceIndices.push([15, 16, 20])
+        faceNormals.push(normal)
 
         // Magnet bumps
         //
@@ -765,7 +907,7 @@ return
         // [6,7,8] [6,8,9] [6,9,A] [7,B,8] [8,B,9] [9,B,A]
 
         normalArray = normalMap.bumps
-        index = 8
+        index = 34
 
         for (ii = 0; ii < 2; ii += 1) {
           normals = normalArray[ii]
