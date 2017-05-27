@@ -1044,9 +1044,11 @@
           faceNormals.push(normalMap.face2in)
         }
       })()
+
+      createSTL(name, vertices, faceIndices, faceNormals)
     })()
 
-    ;(function createSTL(){
+    function createSTL(name, vertices, faceIndices, faceNormals){
       // return
 
       var stl = "solid " + name + "\n"
@@ -1083,7 +1085,7 @@
 
       fs.writeFile(path + name + version + ".stl", stl)
       fs.writeFile(vFile, version)
-    })()
+    }
   }
 
   function e(number) {
