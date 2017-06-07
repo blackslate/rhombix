@@ -1,0 +1,157 @@
+solid obtuse
+
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 105.146 0
+      vertex 170.13 0 0
+      vertex 0 -105.146 0
+    endloop
+  endfacet
+  facet normal 0.526 0.851 0
+    outer loop
+      vertex 157.186 -6.472 4
+      vertex 170.13 0 0
+      vertex 0 105.146 0
+    endloop
+  endfacet
+  facet normal 0.526 0.851 0
+    outer loop
+      vertex 0 90.674 4
+      vertex 157.186 -6.472 4
+      vertex 0 105.146 0
+    endloop
+  endfacet
+  facet normal 0.526 -0.851 0
+    outer loop
+      vertex 0 -103.618 4
+      vertex 0 -105.146 0
+      vertex 170.13 0 0
+    endloop
+  endfacet
+  facet normal 0.526 -0.851 0
+    outer loop
+      vertex 157.186 -6.472 4
+      vertex 0 -103.618 4
+      vertex 170.13 0 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 157.186 -6.472 4
+      vertex 0 90.674 4
+      vertex 0 -103.618 4
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 66.674 13
+      vertex 0 21 4
+      vertex 0 66.674 4
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 66.674 13
+      vertex 0 21 13
+      vertex 0 21 4
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 66.674 13
+      vertex 0 66.674 19.595
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 66.674 19.595
+      vertex 0 -54.922 98.608
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -54.922 98.608
+      vertex 0 -79.618 66.833
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 66.833
+      vertex 0 -79.618 13
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 13
+      vertex 0 -79.618 4
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 4
+      vertex 0 -21 4
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 66.674 13
+      vertex 0 66.674 4
+      vertex 0 21 4
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 66.674 13
+      vertex 0 21 4
+      vertex 0 21 13
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 66.674 19.595
+      vertex 0 66.674 13
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -54.922 98.608
+      vertex 0 66.674 19.595
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 66.833
+      vertex 0 -54.922 98.608
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 13
+      vertex 0 -79.618 66.833
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -79.618 4
+      vertex 0 -79.618 13
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 -21 13
+      vertex 0 -21 4
+      vertex 0 -79.618 4
+    endloop
+  endfacet
+endsolid obtuse
